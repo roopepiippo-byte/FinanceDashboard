@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+/* Dark, card-based design tokens (Constitution: Finnish personal-finance UI) */
+@theme {
+  --color-bg: #0b0e14;
+  --color-card: #141924;
+  --color-card-2: #1a2130;
+  --color-border: #232a38;
+  --color-text: #e6eaf2;
+  --color-muted: #8b95a7;
+  --color-green: #4ade80;
+  --color-red: #f87171;
+  --color-accent: #6ea8fe;
+  --color-accent-fg: #0b0e14;
+
+  --radius-card: 0.75rem;
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-family:
+      system-ui,
+      -apple-system,
+      "Segoe UI",
+      Roboto,
+      Helvetica,
+      Arial,
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  * {
+    border-color: var(--color-border);
+  }
+
+  ::selection {
+    background: rgba(110, 168, 254, 0.35);
+  }
+
+  /* Recessive scrollbars that match the surfaces */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #2a3244 transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #2a3244;
+    border-radius: 8px;
+    border: 2px solid var(--color-bg);
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  /* Native form controls on dark surfaces */
+  input[type="date"],
+  input[type="month"] {
+    color-scheme: dark;
+  }
+}
+
+@layer utilities {
+  /* Columns of figures that must align (tables, lists) — not hero numbers. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+}
