@@ -10,6 +10,8 @@ import type {
   CategoryClass,
   Budget,
   WealthSnapshot,
+  WealthAccount,
+  WealthAccountKind,
 } from "@/types";
 import { transactionsRepo } from "@/data/repositories/transactions";
 import { importedFilesRepo } from "@/data/repositories/importedFiles";
@@ -20,6 +22,11 @@ import { customCategoriesRepo } from "@/data/repositories/customCategories";
 import { settingsRepo } from "@/data/repositories/settings";
 import { budgetRepo, DEFAULT_BUDGET } from "@/data/repositories/budget";
 import { wealthRepo } from "@/data/repositories/wealth";
+import {
+  wealthAccountsRepo,
+  sortAccounts,
+} from "@/data/repositories/wealthAccounts";
+import { newId } from "@/lib/id";
 import { getDB } from "@/data/db";
 import {
   BUILTIN_CATEGORIES,
@@ -54,6 +61,7 @@ interface AppState {
   settings: DisplaySettings;
   budget: Budget;
   wealthSnapshots: WealthSnapshot[];
+  wealthAccounts: WealthAccount[];
   range: DateRange;
 
   init: () => Promise<void>;
@@ -64,6 +72,9 @@ interface AppState {
   saveBudget: (budget: Budget) => Promise<void>;
   upsertWealth: (snapshot: WealthSnapshot) => Promise<void>;
   removeWealth: (month: string) => Promise<void>;
+  addWealthAccount: (name: string, kind: WealthAccountKind) => Promise<void>;
+  updateWealthAccount: (account: WealthAccount) => Promise<void>;
+  removeWealthAccount: (id: string) => Promise<void>;
   toggleCategoryVisibility: (category: string) => Promise<void>;
   setCategoryColor: (category: string, color: string) => Promise<void>;
   resetCategoryColors: () => Promise<void>;
@@ -121,6 +132,7 @@ export const useStore = create<AppState>((set, get) => ({
   settings: { quickSpendCategories: [], carChartHidden: false },
   budget: DEFAULT_BUDGET,
   wealthSnapshots: [],
+  wealthAccounts: [],
   range: computeRange("last12"),
 
   async init() {
@@ -132,7 +144,6 @@ export const useStore = create<AppState>((set, get) => ({
       customCategories,
       settings,
       budget,
-      wealthSnapshots,
     ] = await Promise.all([
       transactionsRepo.getAll(),
       importedFilesRepo.list(),
@@ -141,8 +152,11 @@ export const useStore = create<AppState>((set, get) => ({
       customCategoriesRepo.getAll(),
       settingsRepo.get(),
       budgetRepo.get(),
-      wealthRepo.list(),
     ]);
+    // Snapshots first: listing converts legacy records, which may CREATE
+    // accounts — so accounts must be read after.
+    const wealthSnapshots = await wealthRepo.list();
+    const wealthAccounts = await wealthAccountsRepo.list();
 
     // Seed built-in category settings on first run.
     let categorySettings = await categorySettingsRepo.getAll();
@@ -167,6 +181,7 @@ export const useStore = create<AppState>((set, get) => ({
       settings,
       budget,
       wealthSnapshots,
+      wealthAccounts,
     });
   },
 
@@ -326,6 +341,27 @@ export const useStore = create<AppState>((set, get) => ({
     set({ wealthSnapshots: await wealthRepo.list() });
   },
 
+  async addWealthAccount(name, kind) {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    await wealthAccountsRepo.upsert({ id: newId(), name: trimmed, kind });
+    set({ wealthAccounts: await wealthAccountsRepo.list() });
+  },
+
+  async updateWealthAccount(account) {
+    await wealthAccountsRepo.upsert(account);
+    set({ wealthAccounts: await wealthAccountsRepo.list() });
+  },
+
+  async removeWealthAccount(id) {
+    await wealthAccountsRepo.remove(id);
+    set({
+      wealthAccounts: sortAccounts(
+        get().wealthAccounts.filter((a) => a.id !== id),
+      ),
+    });
+  },
+
   async toggleCategoryVisibility(category) {
     const current = get().categorySettings.find((s) => s.category === category);
     const next: CategorySetting = current
@@ -415,6 +451,7 @@ export const useStore = create<AppState>((set, get) => ({
       db.clear("categorySettings"),
       db.clear("customCategories"),
       db.clear("wealthSnapshots"),
+      db.clear("wealthAccounts"),
       db.clear("settings"),
     ]);
     await get().init();

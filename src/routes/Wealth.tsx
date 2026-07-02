@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useStore } from "@/store";
 import { useToast } from "@/components/ui/toast";
 import { Card, CardTitle, CardValue } from "@/components/ui/card";
@@ -15,119 +16,118 @@ import { cn } from "@/lib/cn";
 import {
   snapshotTotals,
   netWorthSeries,
-  liquidByGroupSeries,
+  liquidByAccountSeries,
   savingsVsReturns,
-  latestGroupDeltas,
+  latestAccountDeltas,
 } from "@/domain/wealth";
-import type { AssetGroup, WealthEntry, WealthSnapshot } from "@/types";
+import type { WealthAccount, WealthSnapshot } from "@/types";
 
-interface DraftEntry {
-  label: string;
-  euros: string;
-}
-interface DraftGroup {
-  label: string;
-  isLiquid: boolean;
-  entries: DraftEntry[];
-}
+const KIND_TITLES = {
+  liquid: "Likvidit varat",
+  investment: "Sijoitukset ja muut varat",
+  debt: "Velat",
+} as const;
 
-function toEuros(cents: number): string {
-  return String(Math.round(cents / 100));
+function toEuros(cents: number | undefined): string {
+  return cents ? String(Math.round(cents) / 100) : "";
 }
 function toCents(euros: string): number {
-  return Math.round((Number(euros) || 0) * 100);
+  const n = Number(euros.replace(",", "."));
+  return Number.isFinite(n) ? Math.round(n * 100) : 0;
 }
-
 function currentMonth(): string {
   return new Date().toISOString().slice(0, 7);
 }
 
-function blankDraft(): {
+interface Draft {
   month: string;
-  groups: DraftGroup[];
-  debts: DraftEntry[];
+  values: Record<string, string>; // accountId -> euro string
   contribution: string;
-} {
-  return {
-    month: currentMonth(),
-    groups: [{ label: "Pankkitilit", isLiquid: true, entries: [{ label: "", euros: "" }] }],
-    debts: [],
-    contribution: "",
-  };
-}
-
-function draftFrom(s: WealthSnapshot) {
-  return {
-    month: s.month,
-    groups: s.groups.map((g) => ({
-      label: g.label,
-      isLiquid: g.isLiquid,
-      entries: g.entries.map((e) => ({ label: e.label, euros: toEuros(e.amountCents) })),
-    })),
-    debts: s.debts.map((d) => ({ label: d.label, euros: toEuros(d.amountCents) })),
-    contribution: s.savingsContributionCents != null ? toEuros(s.savingsContributionCents) : "",
-  };
 }
 
 export function Wealth() {
   const snapshots = useStore((s) => s.wealthSnapshots);
+  const accounts = useStore((s) => s.wealthAccounts);
   const upsertWealth = useStore((s) => s.upsertWealth);
   const removeWealth = useStore((s) => s.removeWealth);
   const toast = useToast();
 
-  const [draft, setDraft] = useState(blankDraft());
-  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<Draft | null>(null);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
   const view = useMemo(() => {
     const latest = snapshots[snapshots.length - 1];
     return {
-      totals: latest ? snapshotTotals(latest) : null,
-      net: netWorthSeries(snapshots),
-      liquid: liquidByGroupSeries(snapshots),
-      source: savingsVsReturns(snapshots),
-      deltas: latestGroupDeltas(snapshots),
+      totals: latest ? snapshotTotals(latest, accounts) : null,
+      latestMonth: latest?.month ?? null,
+      net: netWorthSeries(snapshots, accounts),
+      liquid: liquidByAccountSeries(snapshots, accounts),
+      source: savingsVsReturns(snapshots, accounts),
+      deltas: latestAccountDeltas(snapshots, accounts),
     };
-  }, [snapshots]);
+  }, [snapshots, accounts]);
+
+  function openEditor(existing?: WealthSnapshot) {
+    // Prefill: the month's own values when editing; otherwise the latest
+    // month's values (most accounts change little month to month).
+    const base = existing ?? snapshots[snapshots.length - 1];
+    const values: Record<string, string> = {};
+    for (const a of accounts) {
+      values[a.id] = toEuros(base?.values[a.id]);
+    }
+    setDraft({
+      month: existing?.month ?? currentMonth(),
+      values,
+      contribution:
+        existing?.savingsContributionCents != null
+          ? toEuros(existing.savingsContributionCents)
+          : "",
+    });
+  }
 
   function save() {
-    const groups: AssetGroup[] = draft.groups
-      .map((g) => ({
-        label: g.label.trim() || "Ryhmä",
-        isLiquid: g.isLiquid,
-        entries: g.entries
-          .filter((e) => e.label.trim() || e.euros)
-          .map<WealthEntry>((e) => ({ label: e.label.trim(), amountCents: toCents(e.euros) })),
-      }))
-      .filter((g) => g.entries.length > 0);
-    const debts: WealthEntry[] = draft.debts
-      .filter((d) => d.label.trim() || d.euros)
-      .map((d) => ({ label: d.label.trim(), amountCents: toCents(d.euros) }));
-
+    if (!draft) return;
+    const values: Record<string, number> = {};
+    for (const a of accounts) {
+      const cents = toCents(draft.values[a.id] ?? "");
+      if (cents !== 0) values[a.id] = cents;
+    }
     const snapshot: WealthSnapshot = {
       id: draft.month,
       month: draft.month,
-      groups,
-      debts,
-      savingsContributionCents: draft.contribution ? toCents(draft.contribution) : null,
+      values,
+      savingsContributionCents: draft.contribution
+        ? toCents(draft.contribution)
+        : null,
     };
     void upsertWealth(snapshot).then(() => {
       toast.success(`Tallennettu ${formatMonthFi(draft.month)}`);
-      setEditing(false);
-      setDraft(blankDraft());
+      setDraft(null);
     });
+  }
+
+  if (accounts.length === 0) {
+    return (
+      <Card className="max-w-xl text-sm text-muted">
+        <p>
+          Määrittele ensin varallisuustilit (esim. S-pankki Rahastotili, Nordea
+          Käyttötili, Asuntolaina) — sen jälkeen syötät kullekin arvon
+          kuukausittain tällä sivulla.
+        </p>
+        <Link
+          to="/settings"
+          className="mt-3 inline-block font-medium text-accent hover:underline"
+        >
+          Avaa Asetukset → Varallisuustilit
+        </Link>
+      </Card>
+    );
   }
 
   return (
     <div>
       <div className="mb-4 flex justify-end">
-        <Button
-          size="sm"
-          onClick={() => {
-            setDraft(blankDraft());
-            setEditing(true);
-          }}
-        >
+        <Button size="sm" onClick={() => openEditor()}>
           + Uusi kuukausi
         </Button>
       </div>
@@ -155,10 +155,11 @@ export function Wealth() {
 
       {snapshots.length === 0 ? (
         <Card className="text-sm text-muted">
-          Ei varallisuustietoja. Lisää ensimmäinen kuukausi “+ Uusi kuukausi”.
+          Ei kuukausia vielä. Lisää ensimmäinen ”+ Uusi kuukausi” -napista —
+          tilisi ovat valmiina lomakkeessa.
         </Card>
       ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           <Card>
             <CardTitle>Nettovarallisuus ajassa</CardTitle>
             <div className="mt-3">
@@ -166,11 +167,11 @@ export function Wealth() {
             </div>
           </Card>
           <Card>
-            <CardTitle>Likvidit varat ryhmittäin</CardTitle>
+            <CardTitle>Likvidit varat tileittäin</CardTitle>
             <div className="mt-3">
               <LiquidChart
                 points={view.liquid.points}
-                groupLabels={view.liquid.groupLabels}
+                labels={view.liquid.labels}
               />
             </div>
           </Card>
@@ -181,34 +182,47 @@ export function Wealth() {
             </div>
           </Card>
           <Card>
-            <CardTitle>Viimeisin kuukausi</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>
+                Viimeisin kuukausi
+                {view.latestMonth ? ` — ${formatMonthFi(view.latestMonth)}` : ""}
+              </CardTitle>
+            </div>
             <table className="mt-3 w-full text-sm">
               <tbody>
-                {view.deltas.map((d) => (
-                  <tr key={d.label} className="border-b border-border last:border-0">
-                    <td className="py-2 text-text">{d.label}</td>
-                    <td className="py-2 text-right text-muted">
-                      {formatEur(d.currentCents)}
-                    </td>
-                    <td
-                      className={cn(
-                        "py-2 pl-4 text-right text-xs",
-                        (d.deltaCents ?? 0) >= 0 ? "text-green" : "text-red",
-                      )}
+                {view.deltas.map((d) => {
+                  const sign = d.account.kind === "debt" ? -1 : 1;
+                  const value = sign * d.currentCents;
+                  const delta =
+                    d.deltaCents != null ? sign * d.deltaCents : null;
+                  return (
+                    <tr
+                      key={d.account.id}
+                      className="border-b border-border last:border-0"
                     >
-                      {d.deltaCents != null
-                        ? `${d.deltaCents >= 0 ? "+" : ""}${formatEur(d.deltaCents)}`
-                        : "—"}
-                    </td>
-                  </tr>
-                ))}
+                      <td className="py-2 text-text">{d.account.name}</td>
+                      <td className="py-2 text-right tabular-nums text-muted">
+                        {formatEur(value)}
+                      </td>
+                      <td
+                        className={cn(
+                          "py-2 pl-4 text-right text-xs tabular-nums",
+                          (delta ?? 0) >= 0 ? "text-green" : "text-red",
+                        )}
+                      >
+                        {delta != null
+                          ? `${delta >= 0 ? "+" : ""}${formatEur(delta)}`
+                          : "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </Card>
         </div>
       )}
 
-      {/* Snapshot list */}
       {snapshots.length > 0 && (
         <Card className="mt-4">
           <CardTitle>Kuukaudet</CardTitle>
@@ -220,15 +234,12 @@ export function Wealth() {
               >
                 <button
                   className="text-accent hover:underline"
-                  onClick={() => {
-                    setDraft(draftFrom(s));
-                    setEditing(true);
-                  }}
+                  onClick={() => openEditor(s)}
                 >
                   {formatMonthFi(s.month)}
                 </button>
-                <span className="text-muted">
-                  {formatEur(snapshotTotals(s).netCents)}
+                <span className="tabular-nums text-muted">
+                  {formatEur(snapshotTotals(s, accounts).netCents)}
                 </span>
                 <button
                   className="text-muted hover:text-red"
@@ -243,12 +254,13 @@ export function Wealth() {
         </Card>
       )}
 
-      {editing && (
-        <WealthEditor
+      {draft && (
+        <MonthEditor
           draft={draft}
           setDraft={setDraft}
+          accounts={accounts}
           onSave={save}
-          onCancel={() => setEditing(false)}
+          onCancel={() => setDraft(null)}
         />
       )}
 
@@ -268,22 +280,22 @@ export function Wealth() {
   );
 }
 
-/* ---- Editor modal ---- */
+/* ---- Month editor: one value per defined account ---- */
 
-type Draft = ReturnType<typeof blankDraft>;
-
-function WealthEditor({
+function MonthEditor({
   draft,
   setDraft,
+  accounts,
   onSave,
   onCancel,
 }: {
   draft: Draft;
   setDraft: (d: Draft) => void;
+  accounts: WealthAccount[];
   onSave: () => void;
   onCancel: () => void;
 }) {
-  const update = (patch: Partial<Draft>) => setDraft({ ...draft, ...patch });
+  const kinds: WealthAccount["kind"][] = ["liquid", "investment", "debt"];
 
   return (
     <div
@@ -291,163 +303,76 @@ function WealthEditor({
       onClick={onCancel}
     >
       <Card
-        className="my-8 w-full max-w-2xl"
+        className="my-8 w-full max-w-lg"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
-          <CardTitle>Kuukauden tiedot</CardTitle>
+          <CardTitle>Kuukauden arvot</CardTitle>
           <input
             type="month"
             value={draft.month}
-            onChange={(e) => update({ month: e.target.value })}
+            onChange={(e) => setDraft({ ...draft, month: e.target.value })}
             className="h-9 rounded-md border border-border bg-bg px-2 text-sm text-text"
           />
         </div>
 
-        {/* Asset groups */}
-        {draft.groups.map((g, gi) => (
-          <div key={gi} className="mb-4 rounded-md border border-border p-3">
-            <div className="mb-2 flex items-center gap-2">
-              <input
-                value={g.label}
-                placeholder="Ryhmän nimi"
-                onChange={(e) => {
-                  const groups = [...draft.groups];
-                  groups[gi] = { ...g, label: e.target.value };
-                  update({ groups });
-                }}
-                className="h-8 flex-1 rounded-md border border-border bg-bg px-2 text-sm text-text"
-              />
-              <label className="flex items-center gap-1 text-xs text-muted">
-                <input
-                  type="checkbox"
-                  checked={g.isLiquid}
-                  onChange={(e) => {
-                    const groups = [...draft.groups];
-                    groups[gi] = { ...g, isLiquid: e.target.checked };
-                    update({ groups });
-                  }}
-                />
-                Likvidi
-              </label>
-              <button
-                className="text-muted hover:text-red"
-                onClick={() =>
-                  update({ groups: draft.groups.filter((_, i) => i !== gi) })
-                }
-              >
-                ×
-              </button>
-            </div>
-            {g.entries.map((e, ei) => (
-              <div key={ei} className="mb-1 flex gap-2">
-                <input
-                  value={e.label}
-                  placeholder="Erä (esim. Nordea)"
-                  onChange={(ev) => {
-                    const groups = [...draft.groups];
-                    const entries = [...g.entries];
-                    entries[ei] = { ...e, label: ev.target.value };
-                    groups[gi] = { ...g, entries };
-                    update({ groups });
-                  }}
-                  className="h-8 flex-1 rounded-md border border-border bg-bg px-2 text-sm text-text"
-                />
-                <input
-                  type="number"
-                  value={e.euros}
-                  placeholder="€"
-                  onChange={(ev) => {
-                    const groups = [...draft.groups];
-                    const entries = [...g.entries];
-                    entries[ei] = { ...e, euros: ev.target.value };
-                    groups[gi] = { ...g, entries };
-                    update({ groups });
-                  }}
-                  className="h-8 w-28 rounded-md border border-border bg-bg px-2 text-sm text-text"
-                />
+        {kinds.map((kind) => {
+          const group = accounts.filter((a) => a.kind === kind);
+          if (group.length === 0) return null;
+          return (
+            <div key={kind} className="mb-4">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">
+                {KIND_TITLES[kind]}
+              </p>
+              <div className="space-y-1.5">
+                {group.map((a) => (
+                  <label key={a.id} className="flex items-center gap-3">
+                    <span className="min-w-0 flex-1 truncate text-sm text-text">
+                      {a.name}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={draft.values[a.id] ?? ""}
+                        placeholder="0"
+                        onChange={(e) =>
+                          setDraft({
+                            ...draft,
+                            values: {
+                              ...draft.values,
+                              [a.id]: e.target.value,
+                            },
+                          })
+                        }
+                        className="h-8 w-32 rounded-md border border-border bg-bg px-2 text-right text-sm tabular-nums text-text"
+                      />
+                      <span className="text-xs text-muted">€</span>
+                    </div>
+                  </label>
+                ))}
               </div>
-            ))}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                const groups = [...draft.groups];
-                groups[gi] = { ...g, entries: [...g.entries, { label: "", euros: "" }] };
-                update({ groups });
-              }}
-            >
-              + Erä
-            </Button>
-          </div>
-        ))}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() =>
-            update({
-              groups: [
-                ...draft.groups,
-                { label: "", isLiquid: false, entries: [{ label: "", euros: "" }] },
-              ],
-            })
-          }
-        >
-          + Varryhmä
-        </Button>
-
-        {/* Debts */}
-        <div className="mt-4">
-          <p className="mb-2 text-sm font-medium text-text">Velat</p>
-          {draft.debts.map((d, di) => (
-            <div key={di} className="mb-1 flex gap-2">
-              <input
-                value={d.label}
-                placeholder="Velka (esim. Asuntolaina)"
-                onChange={(e) => {
-                  const debts = [...draft.debts];
-                  debts[di] = { ...d, label: e.target.value };
-                  update({ debts });
-                }}
-                className="h-8 flex-1 rounded-md border border-border bg-bg px-2 text-sm text-text"
-              />
-              <input
-                type="number"
-                value={d.euros}
-                placeholder="€"
-                onChange={(e) => {
-                  const debts = [...draft.debts];
-                  debts[di] = { ...d, euros: e.target.value };
-                  update({ debts });
-                }}
-                className="h-8 w-28 rounded-md border border-border bg-bg px-2 text-sm text-text"
-              />
-              <button
-                className="text-muted hover:text-red"
-                onClick={() => update({ debts: draft.debts.filter((_, i) => i !== di) })}
-              >
-                ×
-              </button>
             </div>
-          ))}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => update({ debts: [...draft.debts, { label: "", euros: "" }] })}
-          >
-            + Velka
-          </Button>
-        </div>
+          );
+        })}
 
-        {/* Contribution */}
-        <div className="mt-4 flex items-center gap-2">
-          <label className="text-sm text-muted">Oma sijoitus tässä kuussa (€)</label>
-          <input
-            type="number"
-            value={draft.contribution}
-            onChange={(e) => update({ contribution: e.target.value })}
-            className="h-8 w-28 rounded-md border border-border bg-bg px-2 text-sm text-text"
-          />
+        <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-4">
+          <label className="text-sm text-muted">
+            Oma sijoitus tässä kuussa
+          </label>
+          <div className="flex items-center gap-1">
+            <input
+              type="text"
+              inputMode="decimal"
+              value={draft.contribution}
+              placeholder="0"
+              onChange={(e) =>
+                setDraft({ ...draft, contribution: e.target.value })
+              }
+              className="h-8 w-32 rounded-md border border-border bg-bg px-2 text-right text-sm tabular-nums text-text"
+            />
+            <span className="text-xs text-muted">€</span>
+          </div>
         </div>
 
         <div className="mt-6 flex justify-end gap-2">

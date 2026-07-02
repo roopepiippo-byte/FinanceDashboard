@@ -31,3 +31,10 @@ export function transactionId(
 export function importedFileId(filename: string, importedAt: string): string {
   return fnv1a(`${filename}|${importedAt}`);
 }
+
+/** Fresh random id (wealth accounts etc. — no deterministic key available). */
+export function newId(): string {
+  return (
+    Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
+  );
+}

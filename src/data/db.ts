@@ -7,12 +7,13 @@ import type {
   Budget,
   CategorySetting,
   CustomCategory,
+  WealthAccount,
   WealthSnapshot,
   DisplaySettings,
 } from "@/types";
 
 export const DB_NAME = "finance-dashboard-v3";
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
 /** Fixed keys for singleton stores. */
 export const BUDGET_KEY = "budget";
@@ -31,6 +32,7 @@ interface FinanceDB extends DBSchema {
   categorySettings: { key: string; value: CategorySetting };
   customCategories: { key: string; value: CustomCategory };
   wealthSnapshots: { key: string; value: WealthSnapshot };
+  wealthAccounts: { key: string; value: WealthAccount };
   settings: { key: string; value: DisplaySettings };
 }
 
@@ -39,19 +41,26 @@ let dbPromise: Promise<IDBPDatabase<FinanceDB>> | null = null;
 export function getDB(): Promise<IDBPDatabase<FinanceDB>> {
   if (!dbPromise) {
     dbPromise = openDB<FinanceDB>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
-        const tx = db.createObjectStore("transactions", { keyPath: "id" });
-        tx.createIndex("date", "date");
-        tx.createIndex("category", "category");
+      upgrade(db, oldVersion) {
+        if (oldVersion < 1) {
+          const tx = db.createObjectStore("transactions", { keyPath: "id" });
+          tx.createIndex("date", "date");
+          tx.createIndex("category", "category");
 
-        db.createObjectStore("importedFiles", { keyPath: "id" });
-        db.createObjectStore("categoryMap", { keyPath: "pattern" });
-        db.createObjectStore("overrides", { keyPath: "transactionId" });
-        db.createObjectStore("budget"); // singleton, out-of-line key
-        db.createObjectStore("categorySettings", { keyPath: "category" });
-        db.createObjectStore("customCategories", { keyPath: "name" });
-        db.createObjectStore("wealthSnapshots", { keyPath: "id" });
-        db.createObjectStore("settings"); // singleton, out-of-line key
+          db.createObjectStore("importedFiles", { keyPath: "id" });
+          db.createObjectStore("categoryMap", { keyPath: "pattern" });
+          db.createObjectStore("overrides", { keyPath: "transactionId" });
+          db.createObjectStore("budget"); // singleton, out-of-line key
+          db.createObjectStore("categorySettings", { keyPath: "category" });
+          db.createObjectStore("customCategories", { keyPath: "name" });
+          db.createObjectStore("wealthSnapshots", { keyPath: "id" });
+          db.createObjectStore("settings"); // singleton, out-of-line key
+        }
+        if (oldVersion < 2) {
+          // v2: fixed wealth accounts; snapshot values keyed by account id.
+          // Legacy snapshot records are converted in the store's init.
+          db.createObjectStore("wealthAccounts", { keyPath: "id" });
+        }
       },
     });
   }

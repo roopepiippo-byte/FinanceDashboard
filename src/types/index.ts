@@ -72,15 +72,16 @@ export interface CustomCategory {
   color: string;
 }
 
-export interface WealthEntry {
-  label: string;
-  amountCents: number;
-}
+export type WealthAccountKind = "liquid" | "investment" | "debt";
 
-export interface AssetGroup {
-  label: string;
-  isLiquid: boolean;
-  entries: WealthEntry[];
+/**
+ * A fixed wealth account the user defines once (e.g. "S-pankki Rahastotili",
+ * "Nordea Käyttötili", "Asuntolaina") and then fills a value for each month.
+ */
+export interface WealthAccount {
+  id: string;
+  name: string;
+  kind: WealthAccountKind;
 }
 
 export interface WealthSnapshot {
@@ -88,8 +89,21 @@ export interface WealthSnapshot {
   id: string;
   /** YYYY-MM */
   month: string;
-  groups: AssetGroup[];
-  debts: WealthEntry[];
+  /** accountId -> integer cents (debts entered as positive magnitudes). */
+  values: Record<string, number>;
+  savingsContributionCents: number | null;
+}
+
+/** Legacy (pre-account) snapshot shape; migrated on load. */
+export interface LegacyWealthSnapshot {
+  id: string;
+  month: string;
+  groups: {
+    label: string;
+    isLiquid: boolean;
+    entries: { label: string; amountCents: number }[];
+  }[];
+  debts: { label: string; amountCents: number }[];
   savingsContributionCents: number | null;
 }
 

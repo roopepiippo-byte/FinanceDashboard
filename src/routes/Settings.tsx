@@ -6,9 +6,15 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm";
 import { cn } from "@/lib/cn";
-import type { CategoryClass } from "@/types";
+import type { CategoryClass, WealthAccountKind } from "@/types";
 
 type DangerAction = "transactions" | "map" | "all" | null;
+
+const KIND_LABELS: Record<WealthAccountKind, string> = {
+  liquid: "Likvidi",
+  investment: "Sijoitus / muu",
+  debt: "Velka",
+};
 
 export function Settings() {
   const transactions = useStore((s) => s.rawTransactions);
@@ -31,7 +37,18 @@ export function Settings() {
   const resetAll = useStore((s) => s.resetAll);
   const toast = useToast();
 
+  const wealthAccounts = useStore((s) => s.wealthAccounts);
+  const addWealthAccount = useStore((s) => s.addWealthAccount);
+  const updateWealthAccount = useStore((s) => s.updateWealthAccount);
+  const removeWealthAccount = useStore((s) => s.removeWealthAccount);
+
   const [mode, setMode] = useState<"merge" | "replace">("merge");
+  const [newAccount, setNewAccount] = useState("");
+  const [newAccountKind, setNewAccountKind] =
+    useState<WealthAccountKind>("liquid");
+  const [pendingAccountDelete, setPendingAccountDelete] = useState<
+    string | null
+  >(null);
   const [busy, setBusy] = useState(false);
   const [danger, setDanger] = useState<DangerAction>(null);
   const [newCat, setNewCat] = useState("");
@@ -180,6 +197,94 @@ export function Settings() {
         </label>
       </Card>
 
+      {/* Wealth accounts */}
+      <Card className="mb-4">
+        <CardTitle>Varallisuustilit</CardTitle>
+        <p className="mt-2 text-sm text-muted">
+          Määrittele tilit, joille syötät arvon kuukausittain
+          Varallisuus-sivulla (esim. S-pankki Rahastotili, Nordea Käyttötili,
+          Asuntolaina).
+        </p>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-b border-border pb-4">
+          <input
+            value={newAccount}
+            onChange={(e) => setNewAccount(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && newAccount.trim()) {
+                void addWealthAccount(newAccount, newAccountKind);
+                setNewAccount("");
+              }
+            }}
+            placeholder="Uusi tili (esim. S-pankki Rahastotili)"
+            className="h-9 min-w-64 flex-1 rounded-md border border-border bg-bg px-2 text-sm text-text"
+          />
+          <select
+            value={newAccountKind}
+            onChange={(e) =>
+              setNewAccountKind(e.target.value as WealthAccountKind)
+            }
+            className="h-9 rounded-md border border-border bg-bg px-2 text-sm text-text"
+          >
+            {(Object.keys(KIND_LABELS) as WealthAccountKind[]).map((k) => (
+              <option key={k} value={k}>
+                {KIND_LABELS[k]}
+              </option>
+            ))}
+          </select>
+          <Button
+            size="sm"
+            disabled={!newAccount.trim()}
+            onClick={async () => {
+              await addWealthAccount(newAccount, newAccountKind);
+              toast.success(`Lisätty ${newAccount.trim()}`);
+              setNewAccount("");
+            }}
+          >
+            Lisää
+          </Button>
+        </div>
+
+        {wealthAccounts.length === 0 ? (
+          <p className="mt-3 text-sm text-muted">Ei tilejä vielä.</p>
+        ) : (
+          <ul className="mt-3 space-y-1">
+            {wealthAccounts.map((a) => (
+              <li key={a.id} className="flex items-center gap-2">
+                <span className="min-w-0 flex-1 truncate text-sm text-text">
+                  {a.name}
+                </span>
+                <select
+                  value={a.kind}
+                  onChange={(e) =>
+                    void updateWealthAccount({
+                      ...a,
+                      kind: e.target.value as WealthAccountKind,
+                    })
+                  }
+                  className="h-8 rounded-md border border-border bg-bg px-2 text-xs text-muted"
+                >
+                  {(Object.keys(KIND_LABELS) as WealthAccountKind[]).map(
+                    (k) => (
+                      <option key={k} value={k}>
+                        {KIND_LABELS[k]}
+                      </option>
+                    ),
+                  )}
+                </select>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setPendingAccountDelete(a.id)}
+                >
+                  Poista
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
       {/* Category settings */}
       <Card className="mb-4">
         <div className="flex items-center justify-between">
@@ -285,6 +390,20 @@ export function Settings() {
           </Button>
         </div>
       </Card>
+
+      <ConfirmDialog
+        open={pendingAccountDelete !== null}
+        title="Poista tili"
+        message="Tili poistetaan. Kuukausien tallennetut arvot säilyvät, mutta ne eivät enää näy laskelmissa."
+        confirmLabel="Poista"
+        onCancel={() => setPendingAccountDelete(null)}
+        onConfirm={async () => {
+          const id = pendingAccountDelete!;
+          setPendingAccountDelete(null);
+          await removeWealthAccount(id);
+          toast.success("Tili poistettu");
+        }}
+      />
 
       <ConfirmDialog
         open={danger !== null}

@@ -1,5 +1,4 @@
-import type { WealthSnapshot } from "@/types";
-import { sumCents } from "@/domain/money";
+import type { WealthAccount, WealthSnapshot } from "@/types";
 
 export interface SnapshotTotals {
   assetsCents: number;
@@ -8,21 +7,28 @@ export interface SnapshotTotals {
   liquidCents: number;
 }
 
-export function snapshotTotals(s: WealthSnapshot): SnapshotTotals {
-  const assetsCents = sumCents(
-    s.groups.flatMap((g) => g.entries.map((e) => e.amountCents)),
-  );
-  const debtsCents = sumCents(s.debts.map((d) => d.amountCents));
-  const liquidCents = sumCents(
-    s.groups
-      .filter((g) => g.isLiquid)
-      .flatMap((g) => g.entries.map((e) => e.amountCents)),
-  );
+/** Totals for one month over the defined accounts (orphan values ignored). */
+export function snapshotTotals(
+  s: WealthSnapshot,
+  accounts: WealthAccount[],
+): SnapshotTotals {
+  let assets = 0;
+  let debts = 0;
+  let liquid = 0;
+  for (const a of accounts) {
+    const v = s.values[a.id] ?? 0;
+    if (a.kind === "debt") {
+      debts += v;
+    } else {
+      assets += v;
+      if (a.kind === "liquid") liquid += v;
+    }
+  }
   return {
-    assetsCents,
-    debtsCents,
-    netCents: assetsCents - debtsCents,
-    liquidCents,
+    assetsCents: assets,
+    debtsCents: debts,
+    netCents: assets - debts,
+    liquidCents: liquid,
   };
 }
 
@@ -31,34 +37,34 @@ export interface NetWorthPoint {
   netCents: number;
 }
 
-export function netWorthSeries(snapshots: WealthSnapshot[]): NetWorthPoint[] {
+export function netWorthSeries(
+  snapshots: WealthSnapshot[],
+  accounts: WealthAccount[],
+): NetWorthPoint[] {
   return snapshots.map((s) => ({
     month: s.month,
-    netCents: snapshotTotals(s).netCents,
+    netCents: snapshotTotals(s, accounts).netCents,
   }));
 }
 
-/** Per-month liquid total by group label (for a stacked bar). */
+/** Per-month liquid value by account name (stacked bar). */
 export interface LiquidPoint {
   month: string;
-  groups: Record<string, number>;
+  values: Record<string, number>; // account name -> cents
 }
 
-export function liquidByGroupSeries(
+export function liquidByAccountSeries(
   snapshots: WealthSnapshot[],
-): { points: LiquidPoint[]; groupLabels: string[] } {
-  const labels = new Set<string>();
-  const points = snapshots.map((s) => {
-    const groups: Record<string, number> = {};
-    for (const g of s.groups) {
-      if (!g.isLiquid) continue;
-      labels.add(g.label);
-      groups[g.label] =
-        (groups[g.label] ?? 0) + sumCents(g.entries.map((e) => e.amountCents));
-    }
-    return { month: s.month, groups };
-  });
-  return { points, groupLabels: [...labels] };
+  accounts: WealthAccount[],
+): { points: LiquidPoint[]; labels: string[] } {
+  const liquidAccounts = accounts.filter((a) => a.kind === "liquid");
+  const points = snapshots.map((s) => ({
+    month: s.month,
+    values: Object.fromEntries(
+      liquidAccounts.map((a) => [a.name, s.values[a.id] ?? 0]),
+    ),
+  }));
+  return { points, labels: liquidAccounts.map((a) => a.name) };
 }
 
 export interface SavingsReturnsPoint {
@@ -74,9 +80,10 @@ export interface SavingsReturnsPoint {
  */
 export function savingsVsReturns(
   snapshots: WealthSnapshot[],
+  accounts: WealthAccount[],
 ): SavingsReturnsPoint[] {
   if (snapshots.length === 0) return [];
-  const nets = snapshots.map((s) => snapshotTotals(s).netCents);
+  const nets = snapshots.map((s) => snapshotTotals(s, accounts).netCents);
   let own = nets[0];
   let returns = 0;
   const out: SavingsReturnsPoint[] = [
@@ -92,35 +99,26 @@ export function savingsVsReturns(
   return out;
 }
 
-export interface GroupDelta {
-  label: string;
+export interface AccountDelta {
+  account: WealthAccount;
   currentCents: number;
   deltaCents: number | null;
 }
 
-/** Latest snapshot's group/debt totals with delta from the previous month. */
-export function latestGroupDeltas(snapshots: WealthSnapshot[]): GroupDelta[] {
+/** Latest snapshot's per-account values with delta from the previous month. */
+export function latestAccountDeltas(
+  snapshots: WealthSnapshot[],
+  accounts: WealthAccount[],
+): AccountDelta[] {
   if (snapshots.length === 0) return [];
   const latest = snapshots[snapshots.length - 1];
   const prev = snapshots[snapshots.length - 2];
-
-  const totalsFor = (s: WealthSnapshot | undefined) => {
-    const m = new Map<string, number>();
-    if (!s) return m;
-    for (const g of s.groups) {
-      m.set(g.label, sumCents(g.entries.map((e) => e.amountCents)));
-    }
-    for (const d of s.debts) {
-      m.set(`${d.label} (velka)`, -d.amountCents);
-    }
-    return m;
-  };
-
-  const cur = totalsFor(latest);
-  const prv = totalsFor(prev);
-  return [...cur.entries()].map(([label, currentCents]) => ({
-    label,
-    currentCents,
-    deltaCents: prev ? currentCents - (prv.get(label) ?? 0) : null,
-  }));
+  return accounts.map((a) => {
+    const currentCents = latest.values[a.id] ?? 0;
+    return {
+      account: a,
+      currentCents,
+      deltaCents: prev ? currentCents - (prev.values[a.id] ?? 0) : null,
+    };
+  });
 }

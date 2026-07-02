@@ -72,14 +72,14 @@ export function NetWorthChart({ data }: { data: NetWorthPoint[] }) {
 
 export function LiquidChart({
   points,
-  groupLabels,
+  labels,
 }: {
   points: LiquidPoint[];
-  groupLabels: string[];
+  labels: string[];
 }) {
   const data = points.map((p) => ({
     month: p.month,
-    ...Object.fromEntries(groupLabels.map((g) => [g, (p.groups[g] ?? 0) / 100])),
+    ...Object.fromEntries(labels.map((g) => [g, (p.values[g] ?? 0) / 100])),
   }));
   return (
     <ResponsiveContainer width="100%" height={260}>
@@ -98,8 +98,8 @@ export function LiquidChart({
           labelFormatter={(m) => monthTick(String(m))}
           formatter={(v, n) => [formatEur(Number(v) * 100), String(n)]}
         />
-        {groupLabels.length > 1 && <Legend formatter={legendText} />}
-        {groupLabels.map((g, i) => (
+        {labels.length > 1 && <Legend formatter={legendText} />}
+        {labels.map((g, i) => (
           <Bar
             key={g}
             dataKey={g}
