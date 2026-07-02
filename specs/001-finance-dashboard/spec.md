@@ -264,3 +264,26 @@ A user opens the Asetukset (Settings) page to review a data summary, export and 
 - Receipt scanning.
 - Full data-bundle export/import (transactions, budgets, wealth) and cross-version migration of anything other than category data.
 - Any cloud sync, accounts, authentication, or external API integration.
+
+## Implementation Decisions (post-plan, kept in sync per Constitution P7)
+
+Recorded during implementation; each is deliberate and supersedes the earlier
+text where they conflict.
+
+1. **Category data file is CSV, not JSON** (FR-026/FR-027). The user maintains a
+   long-lived merchant→category database in Google Sheets; the portable format is
+   its CSV export (`merchantKey, displayName, category, group` — group `Tulot`→
+   income, `Siirrot`→transfer, otherwise expense). Export writes the same format
+   back so the sheet round-trips. See `contracts/category-file.md`.
+2. **Date-range scope narrowed** (FR-031): the range selector applies to
+   Kojelauta and Tapahtumat. Budjetti intentionally uses a rolling 12-month
+   history plus current-month meters; Luokittele lists all uncategorized
+   transactions regardless of range.
+3. **Nordea format refinement**: real exports use `yyyy/mm/dd` booking dates and
+   carry the payee in the `Nimi` column (`Maksaja`/`Maksunsaaja` hold IBANs).
+   Parser accepts `yyyy/mm/dd`, ISO, and `dd.mm.yyyy`.
+4. **Features beyond spec** (additive): category suggestions on Luokittele
+   (token similarity against the rule DB), top-merchants card and KPI sparklines
+   on Kojelauta, filtered totals + column sorting on Tapahtumat,
+   month-vs-target budget meters, per-category color editing / quick-spend
+   selection in Asetukset, CVD-validated default category palette.

@@ -178,10 +178,10 @@ Single-project React SPA: source in `src/`, domain tests co-located as
 
 **Purpose**: Meet the polished-UX bar and the local-first/offline guarantees across all stories
 
-- [ ] T052 [P] Ensure empty/loading/error states + toasts on every page (Constitution Principle V)
-- [ ] T053 [P] Offline/no-network verification: self-host fonts, confirm zero runtime external requests (Constitution Principle I / research D10)
+- [X] T052 [P] Ensure empty/loading/error states + toasts on every page (Constitution Principle V)
+- [X] T053 [P] Offline/no-network verification: self-host fonts, confirm zero runtime external requests (Constitution Principle I / research D10)
 - [ ] T054 [P] Responsive + accessibility pass (dark theme contrast, keyboard nav, mobile-friendly cards/tables)
-- [ ] T055 [P] Finnish localization audit (all labels, EUR currency, `dd.mm.yyyy` dates, Finnish number formatting) — FR-032/SC-007
+- [X] T055 [P] Finnish localization audit (all labels, EUR currency, `dd.mm.yyyy` dates, Finnish number formatting) — FR-032/SC-007
 - [ ] T056 Run `quickstart.md` validation scenarios end-to-end (US1–US7) and fix gaps
 
 ---

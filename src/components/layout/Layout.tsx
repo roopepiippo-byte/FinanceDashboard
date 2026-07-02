@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { useStore } from "@/store";
 import { Sidebar } from "./Sidebar";
@@ -21,9 +21,12 @@ export function Layout() {
   const hydrated = useStore((s) => s.hydrated);
   const init = useStore((s) => s.init);
   const { pathname } = useLocation();
+  const [initError, setInitError] = useState<string | null>(null);
 
   useEffect(() => {
-    void init();
+    init().catch((e: unknown) => {
+      setInitError(e instanceof Error ? e.message : String(e));
+    });
   }, [init]);
 
   return (
@@ -37,7 +40,19 @@ export function Layout() {
           {RANGE_SCOPED.has(pathname) && <DateRangePicker />}
         </header>
         <main className="flex-1 overflow-y-auto p-6">
-          {hydrated ? (
+          {initError ? (
+            <div className="max-w-lg rounded-[var(--radius-card)] border border-red/40 bg-card p-5 text-sm">
+              <p className="font-medium text-red">
+                Tietokannan avaaminen epäonnistui
+              </p>
+              <p className="mt-2 text-muted">
+                Selain esti paikallisen tietokannan (IndexedDB). Tarkista,
+                ettei käytössä ole yksityinen selaustila, ja lataa sivu
+                uudelleen.
+              </p>
+              <p className="mt-2 text-xs text-muted/60">{initError}</p>
+            </div>
+          ) : hydrated ? (
             <Outlet />
           ) : (
             <p className="text-sm text-muted">Ladataan…</p>

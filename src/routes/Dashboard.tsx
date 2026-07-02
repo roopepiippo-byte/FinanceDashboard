@@ -98,6 +98,15 @@ export function Dashboard() {
     [monthly],
   );
 
+  if (view.txns.length === 0) {
+    return (
+      <Card className="text-sm text-muted">
+        Ei tapahtumia valitulla aikavälillä. Vaihda aikaväliä oikean yläkulman
+        valitsimesta tai tuo lisää tapahtumia.
+      </Card>
+    );
+  }
+
   return (
     <div>
       {/* KPI stat tiles */}

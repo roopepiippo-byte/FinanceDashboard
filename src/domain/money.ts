@@ -55,11 +55,11 @@ export function parseFinnishAmountToCents(raw: string): number {
     .replace(",", ".") // comma decimal -> dot
     .trim();
   if (cleaned === "" || cleaned === "-") {
-    throw new Error(`Unparseable amount: "${raw}"`);
+    throw new Error(`Virheellinen summa: "${raw}"`);
   }
   const value = Number(cleaned);
   if (!Number.isFinite(value)) {
-    throw new Error(`Unparseable amount: "${raw}"`);
+    throw new Error(`Virheellinen summa: "${raw}"`);
   }
   return roundCents(value * 100);
 }

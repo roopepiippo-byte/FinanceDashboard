@@ -21,7 +21,7 @@ export function formatMonthFi(month: string): string {
 export function parseFinnishDateToIso(raw: string): string {
   const parts = raw.trim().split(".");
   if (parts.length !== 3) {
-    throw new Error(`Unparseable date: "${raw}"`);
+    throw new Error(`Virheellinen päivämäärä: "${raw}"`);
   }
   const [d, m, y] = parts;
   const day = Number(d);
@@ -37,7 +37,7 @@ export function parseFinnishDateToIso(raw: string): string {
     month > 12 ||
     year < 1000
   ) {
-    throw new Error(`Unparseable date: "${raw}"`);
+    throw new Error(`Virheellinen päivämäärä: "${raw}"`);
   }
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${year}-${pad(month)}-${pad(day)}`;

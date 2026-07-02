@@ -1,43 +1,57 @@
 # Contract: Category Data File (export / import)
 
-**Feature**: 001-finance-dashboard | **Phase**: 1
+**Feature**: 001-finance-dashboard | **Phase**: 1 (revised during implementation)
 
 The one portable dataset (Constitution Principle III, FR-026/FR-027). A single
-JSON file the user can export from Settings and re-import into any instance.
+**CSV** file the user can export from Asetukset and re-import into any instance.
+
+> **Format decision**: the original plan specified JSON. Implementation switched
+> to CSV because the user's authoritative category database lives in Google
+> Sheets — the app consumes the sheet's CSV export directly and exports the same
+> shape back, so the sheet round-trips without conversion. Recorded in spec.md →
+> Implementation Decisions.
 
 ## Format
 
-```json
-{
-  "format": "finance-dashboard-category-data",
-  "version": 1,
-  "exportedAt": "2026-07-01T12:00:00.000Z",
-  "categoryMap": [
-    { "pattern": "k-supermarket*", "category": "Ruoka", "class": "expense" },
-    { "pattern": "nordea*",        "category": "Palkka", "class": "income" }
-  ],
-  "customCategories": [
-    { "name": "Harrastukset", "class": "expense", "color": "#8ab4f8" }
-  ],
-  "categorySettings": [
-    { "category": "Ruoka", "visible": true, "color": "#4ade80" }
-  ]
-}
+One row per merchant rule, comma-separated, UTF-8 (BOM tolerated):
+
+```csv
+merchantKey,displayName,category,group
+aasia market tampere,Aasia Market Tampere,Ruoka,Välttämättömät
+"vipps","VIPPS MOBILEPAY AS, OSLO",Mobile Pay,Muuttuvat
+fellowmind finland,FELLOWMIND FINLAND OY AB,Palkka,Tulot
 ```
+
+- **merchantKey** — lowercase match key against `merchantLower`; may contain `*`
+  globs. Unique; last occurrence wins.
+- **displayName** — original merchant casing, preserved for round-trip. May
+  contain commas (quoted or not — parser reads `category`/`group` from the row
+  END, so unquoted commas in the middle stay part of the display name).
+- **category** — canonicalized case-insensitively to built-in names
+  (e.g. `Mobile pay` → `Mobile Pay`); unknown names create custom categories.
+- **group** — budget group from the sheet. Class inference: `Tulot` → income,
+  `Siirrot` → transfer, anything else → expense (built-in categories keep their
+  built-in class).
 
 ## Rules
 
-- **Export**: writes the current `categoryMap`, `customCategories`, and
-  `categorySettings`. No transactions, budgets, or wealth data are included.
+- **Export**: writes every `categoryMap` entry as
+  `merchantKey,displayName,category,group`, sorted by key, CRLF line endings,
+  fields quoted only when needed. Rules created in-app carry a group derived
+  from their class (income → `Tulot`, transfer → `Siirrot`, expense →
+  `Muuttuvat`).
 - **Import** (FR-027):
-  - User chooses **merge** or **replace** (with confirmation).
-  - *Merge*: incoming entries upsert by key (`pattern` / `name` / `category`);
-    existing unrelated entries are kept.
-  - *Replace*: the three datasets are cleared and replaced with the file's.
-  - A partial or older file (e.g., missing `customCategories`, or `version` < 1)
-    MUST NOT corrupt existing data — absent sections are skipped, missing fields
-    fall back to defaults (edge case in spec).
-- **Validation**: reject files whose top-level `format` is not
-  `finance-dashboard-category-data`; surface a clear error and import nothing.
-- `version` enables forward migration; unknown newer versions import known fields
-  and warn.
+  - User chooses **merge** or **replace**.
+  - *Merge*: upsert by `merchantKey` in one IndexedDB transaction.
+  - *Replace*: the category map is cleared and replaced with the file's rows.
+  - Malformed rows (fewer than 2 fields, empty key/category) are skipped and
+    counted; a partial file never corrupts existing data.
+  - New category names create `customCategories` + visible `categorySettings`
+    entries with assigned colors.
+- **Round-trip**: `parse(serialize(entries)) === entries` (unit-tested in
+  `src/domain/categoryDb.test.ts`).
+
+## Implementation
+
+`src/domain/categoryDb.ts` (`parseCategoryDbCsv`, `serializeCategoryDbCsv`);
+store actions `importCategoryDb(text, mode)` / `exportCategoryDb()`.
