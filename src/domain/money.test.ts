@@ -8,6 +8,7 @@ import {
   centsFromPct,
   parseFinnishAmountToCents,
   parseEuroInputToCents,
+  splitPastedEuroValues,
   formatEur,
 } from "./money";
 
@@ -89,6 +90,34 @@ describe("parseEuroInputToCents", () => {
     expect(parseEuroInputToCents("   ")).toBeNull();
     expect(parseEuroInputToCents("abc")).toBeNull();
     expect(parseEuroInputToCents("-")).toBeNull();
+  });
+});
+
+describe("splitPastedEuroValues", () => {
+  it("splits a Sheets column copy (values with €, CRLF, trailing newline)", () => {
+    const text = "4,00 €\r\n0,00 €\r\n12 500,00 €\r\n";
+    expect(splitPastedEuroValues(text)).toEqual(["4,00", "0,00", "12 500,00"]);
+  });
+
+  it("splits a horizontal row copy on tabs", () => {
+    expect(splitPastedEuroValues("4,00 €\t33,00 €\t78,00 €")).toEqual([
+      "4,00",
+      "33,00",
+      "78,00",
+    ]);
+  });
+
+  it("takes the last numeric cell from a label+value column copy", () => {
+    const text = "S-pankki Rahastotili\t4,00 €\nNordea Käyttötili\t33,00 €";
+    expect(splitPastedEuroValues(text)).toEqual(["4,00", "33,00"]);
+  });
+
+  it("keeps blank cells as empty strings to preserve alignment", () => {
+    expect(splitPastedEuroValues("4,00\n\n9,00\n")).toEqual(["4,00", "", "9,00"]);
+  });
+
+  it("handles a single plain value", () => {
+    expect(splitPastedEuroValues("55,00 €")).toEqual(["55,00"]);
   });
 });
 

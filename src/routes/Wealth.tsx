@@ -10,7 +10,11 @@ import {
   LiquidChart,
   WealthSourceChart,
 } from "@/components/charts/WealthCharts";
-import { formatEur, parseEuroInputToCents } from "@/domain/money";
+import {
+  formatEur,
+  parseEuroInputToCents,
+  splitPastedEuroValues,
+} from "@/domain/money";
 import { formatMonthFi } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import {
@@ -295,6 +299,26 @@ function MonthEditor({
   onSave: () => void;
   onCancel: () => void;
 }) {
+  /**
+   * Multi-cell paste from Sheets/Excel: distribute the pasted values down the
+   * account list starting at the field that was pasted into.
+   */
+  function handlePaste(
+    startIdx: number,
+    e: React.ClipboardEvent<HTMLInputElement>,
+  ) {
+    const text = e.clipboardData.getData("text/plain");
+    if (!/[\n\t]/.test(text)) return; // single value → default paste
+    e.preventDefault();
+    const pasted = splitPastedEuroValues(text);
+    const values = { ...draft.values };
+    pasted.forEach((v, k) => {
+      const account = accounts[startIdx + k];
+      if (account) values[account.id] = v;
+    });
+    setDraft({ ...draft, values });
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4"
@@ -317,7 +341,7 @@ function MonthEditor({
         {/* Accounts in the user's custom order (Asetukset → Varallisuustilit),
             so mass entry follows the same order the values are checked in. */}
         <div className="space-y-1.5">
-          {accounts.map((a) => {
+          {accounts.map((a, i) => {
             const chip = KIND_CHIPS[a.kind];
             return (
               <label key={a.id} className="flex items-center gap-3">
@@ -338,6 +362,7 @@ function MonthEditor({
                     inputMode="decimal"
                     value={draft.values[a.id] ?? ""}
                     placeholder="0"
+                    onPaste={(e) => handlePaste(i, e)}
                     onChange={(e) =>
                       setDraft({
                         ...draft,
@@ -355,6 +380,11 @@ function MonthEditor({
             );
           })}
         </div>
+
+        <p className="mt-3 text-xs text-muted/70">
+          Vinkki: kopioi arvosarake Sheetsistä ja liitä ensimmäiseen kenttään —
+          arvot täyttyvät riveille järjestyksessä.
+        </p>
 
         <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-4">
           <label className="text-sm text-muted">

@@ -92,6 +92,37 @@ export function parseEuroInputToCents(raw: string): number | null {
   return roundCents(value * 100);
 }
 
+/**
+ * Split a multi-cell paste (Google Sheets / Excel) into cleaned euro value
+ * strings, in order. Handles:
+ *  - a column copy: newline-separated lines ("4,00 €\n33,00 €\n…")
+ *  - a row copy: one line of tab-separated cells
+ *  - a two-column copy (label + value): per line, the LAST cell that parses
+ *    as a number is taken
+ * Blank cells stay as "" so positions keep their alignment. The returned
+ * strings are display values ("4,00", "12 500") — parse with
+ * `parseEuroInputToCents` when converting to cents.
+ */
+export function splitPastedEuroValues(text: string): string[] {
+  const rows = text.replace(/\r/g, "").split("\n");
+  while (rows.length > 0 && rows[rows.length - 1].trim() === "") rows.pop();
+
+  const clean = (cell: string) => cell.replace(/€/g, "").trim();
+
+  // A single line with tabs is a horizontal row copy: one value per cell.
+  if (rows.length === 1) {
+    return rows[0].split("\t").map(clean);
+  }
+
+  return rows.map((line) => {
+    const cells = line.split("\t");
+    for (let c = cells.length - 1; c >= 0; c--) {
+      if (parseEuroInputToCents(cells[c]) !== null) return clean(cells[c]);
+    }
+    return "";
+  });
+}
+
 const eurFormatter = new Intl.NumberFormat("fi-FI", {
   style: "currency",
   currency: "EUR",
