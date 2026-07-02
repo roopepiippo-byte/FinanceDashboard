@@ -22,10 +22,10 @@ import {
 } from "@/domain/wealth";
 import type { WealthAccount, WealthSnapshot } from "@/types";
 
-const KIND_TITLES = {
-  liquid: "Likvidit varat",
-  investment: "Sijoitukset ja muut varat",
-  debt: "Velat",
+const KIND_CHIPS = {
+  liquid: { label: "Likvidi", cls: "bg-accent/10 text-accent" },
+  investment: { label: "Sijoitus", cls: "bg-green/10 text-green" },
+  debt: { label: "Velka", cls: "bg-red/10 text-red" },
 } as const;
 
 function toEuros(cents: number | undefined): string {
@@ -295,8 +295,6 @@ function MonthEditor({
   onSave: () => void;
   onCancel: () => void;
 }) {
-  const kinds: WealthAccount["kind"][] = ["liquid", "investment", "debt"];
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4"
@@ -316,45 +314,47 @@ function MonthEditor({
           />
         </div>
 
-        {kinds.map((kind) => {
-          const group = accounts.filter((a) => a.kind === kind);
-          if (group.length === 0) return null;
-          return (
-            <div key={kind} className="mb-4">
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">
-                {KIND_TITLES[kind]}
-              </p>
-              <div className="space-y-1.5">
-                {group.map((a) => (
-                  <label key={a.id} className="flex items-center gap-3">
-                    <span className="min-w-0 flex-1 truncate text-sm text-text">
-                      {a.name}
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={draft.values[a.id] ?? ""}
-                        placeholder="0"
-                        onChange={(e) =>
-                          setDraft({
-                            ...draft,
-                            values: {
-                              ...draft.values,
-                              [a.id]: e.target.value,
-                            },
-                          })
-                        }
-                        className="h-8 w-32 rounded-md border border-border bg-bg px-2 text-right text-sm tabular-nums text-text"
-                      />
-                      <span className="text-xs text-muted">€</span>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-          );
-        })}
+        {/* Accounts in the user's custom order (Asetukset → Varallisuustilit),
+            so mass entry follows the same order the values are checked in. */}
+        <div className="space-y-1.5">
+          {accounts.map((a) => {
+            const chip = KIND_CHIPS[a.kind];
+            return (
+              <label key={a.id} className="flex items-center gap-3">
+                <span className="min-w-0 flex-1 truncate text-sm text-text">
+                  {a.name}
+                </span>
+                <span
+                  className={cn(
+                    "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+                    chip.cls,
+                  )}
+                >
+                  {chip.label}
+                </span>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={draft.values[a.id] ?? ""}
+                    placeholder="0"
+                    onChange={(e) =>
+                      setDraft({
+                        ...draft,
+                        values: {
+                          ...draft.values,
+                          [a.id]: e.target.value,
+                        },
+                      })
+                    }
+                    className="h-8 w-32 rounded-md border border-border bg-bg px-2 text-right text-sm tabular-nums text-text"
+                  />
+                  <span className="text-xs text-muted">€</span>
+                </div>
+              </label>
+            );
+          })}
+        </div>
 
         <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-4">
           <label className="text-sm text-muted">

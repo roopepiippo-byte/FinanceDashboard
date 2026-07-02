@@ -41,6 +41,7 @@ export function Settings() {
   const addWealthAccount = useStore((s) => s.addWealthAccount);
   const updateWealthAccount = useStore((s) => s.updateWealthAccount);
   const removeWealthAccount = useStore((s) => s.removeWealthAccount);
+  const moveWealthAccount = useStore((s) => s.moveWealthAccount);
 
   const [mode, setMode] = useState<"merge" | "replace">("merge");
   const [newAccount, setNewAccount] = useState("");
@@ -203,7 +204,8 @@ export function Settings() {
         <p className="mt-2 text-sm text-muted">
           Määrittele tilit, joille syötät arvon kuukausittain
           Varallisuus-sivulla (esim. S-pankki Rahastotili, Nordea Käyttötili,
-          Asuntolaina).
+          Asuntolaina). Nuolilla asetat järjestyksen, jossa tilit näkyvät
+          syöttölomakkeessa.
         </p>
 
         <div className="mt-3 flex flex-wrap items-center gap-2 border-b border-border pb-4">
@@ -249,8 +251,26 @@ export function Settings() {
           <p className="mt-3 text-sm text-muted">Ei tilejä vielä.</p>
         ) : (
           <ul className="mt-3 space-y-1">
-            {wealthAccounts.map((a) => (
+            {wealthAccounts.map((a, i) => (
               <li key={a.id} className="flex items-center gap-2">
+                <div className="flex flex-col">
+                  <button
+                    disabled={i === 0}
+                    onClick={() => void moveWealthAccount(a.id, -1)}
+                    title="Siirrä ylös"
+                    className="text-[10px] leading-none text-muted hover:text-text disabled:opacity-20"
+                  >
+                    ▲
+                  </button>
+                  <button
+                    disabled={i === wealthAccounts.length - 1}
+                    onClick={() => void moveWealthAccount(a.id, 1)}
+                    title="Siirrä alas"
+                    className="text-[10px] leading-none text-muted hover:text-text disabled:opacity-20"
+                  >
+                    ▼
+                  </button>
+                </div>
                 <span className="min-w-0 flex-1 truncate text-sm text-text">
                   {a.name}
                 </span>

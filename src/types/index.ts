@@ -82,6 +82,8 @@ export interface WealthAccount {
   id: string;
   name: string;
   kind: WealthAccountKind;
+  /** Custom display/entry order (lower first). Absent on old records. */
+  sortOrder?: number;
 }
 
 export interface WealthSnapshot {

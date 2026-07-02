@@ -75,6 +75,7 @@ interface AppState {
   addWealthAccount: (name: string, kind: WealthAccountKind) => Promise<void>;
   updateWealthAccount: (account: WealthAccount) => Promise<void>;
   removeWealthAccount: (id: string) => Promise<void>;
+  moveWealthAccount: (id: string, direction: -1 | 1) => Promise<void>;
   toggleCategoryVisibility: (category: string) => Promise<void>;
   setCategoryColor: (category: string, color: string) => Promise<void>;
   resetCategoryColors: () => Promise<void>;
@@ -344,8 +345,14 @@ export const useStore = create<AppState>((set, get) => ({
   async addWealthAccount(name, kind) {
     const trimmed = name.trim();
     if (!trimmed) return;
-    await wealthAccountsRepo.upsert({ id: newId(), name: trimmed, kind });
-    set({ wealthAccounts: await wealthAccountsRepo.list() });
+    // Append at the end of the current display order and renumber so every
+    // account carries an explicit sortOrder from here on.
+    const renumbered = [
+      ...get().wealthAccounts,
+      { id: newId(), name: trimmed, kind },
+    ].map((a, i) => ({ ...a, sortOrder: i }));
+    await wealthAccountsRepo.bulkUpsert(renumbered);
+    set({ wealthAccounts: renumbered });
   },
 
   async updateWealthAccount(account) {
@@ -360,6 +367,17 @@ export const useStore = create<AppState>((set, get) => ({
         get().wealthAccounts.filter((a) => a.id !== id),
       ),
     });
+  },
+
+  async moveWealthAccount(id, direction) {
+    const list = [...get().wealthAccounts];
+    const i = list.findIndex((a) => a.id === id);
+    const j = i + direction;
+    if (i < 0 || j < 0 || j >= list.length) return;
+    [list[i], list[j]] = [list[j], list[i]];
+    const renumbered = list.map((a, idx) => ({ ...a, sortOrder: idx }));
+    await wealthAccountsRepo.bulkUpsert(renumbered);
+    set({ wealthAccounts: renumbered });
   },
 
   async toggleCategoryVisibility(category) {
