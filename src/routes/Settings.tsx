@@ -41,7 +41,20 @@ export function Settings() {
   const addWealthAccount = useStore((s) => s.addWealthAccount);
   const updateWealthAccount = useStore((s) => s.updateWealthAccount);
   const removeWealthAccount = useStore((s) => s.removeWealthAccount);
-  const moveWealthAccount = useStore((s) => s.moveWealthAccount);
+  const reorderWealthAccounts = useStore((s) => s.reorderWealthAccounts);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+
+  function dropOn(targetId: string) {
+    if (!dragId || dragId === targetId) return;
+    const ids = wealthAccounts.map((a) => a.id);
+    const from = ids.indexOf(dragId);
+    const to = ids.indexOf(targetId);
+    if (from < 0 || to < 0) return;
+    ids.splice(from, 1);
+    ids.splice(to, 0, dragId);
+    void reorderWealthAccounts(ids);
+  }
 
   const [mode, setMode] = useState<"merge" | "replace">("merge");
   const [newAccount, setNewAccount] = useState("");
@@ -204,8 +217,8 @@ export function Settings() {
         <p className="mt-2 text-sm text-muted">
           Määrittele tilit, joille syötät arvon kuukausittain
           Varallisuus-sivulla (esim. S-pankki Rahastotili, Nordea Käyttötili,
-          Asuntolaina). Nuolilla asetat järjestyksen, jossa tilit näkyvät
-          syöttölomakkeessa.
+          Asuntolaina). Raahaa rivit siihen järjestykseen, jossa haluat syöttää
+          arvot kuukausittain.
         </p>
 
         <div className="mt-3 flex flex-wrap items-center gap-2 border-b border-border pb-4">
@@ -251,26 +264,44 @@ export function Settings() {
           <p className="mt-3 text-sm text-muted">Ei tilejä vielä.</p>
         ) : (
           <ul className="mt-3 space-y-1">
-            {wealthAccounts.map((a, i) => (
-              <li key={a.id} className="flex items-center gap-2">
-                <div className="flex flex-col">
-                  <button
-                    disabled={i === 0}
-                    onClick={() => void moveWealthAccount(a.id, -1)}
-                    title="Siirrä ylös"
-                    className="text-[10px] leading-none text-muted hover:text-text disabled:opacity-20"
-                  >
-                    ▲
-                  </button>
-                  <button
-                    disabled={i === wealthAccounts.length - 1}
-                    onClick={() => void moveWealthAccount(a.id, 1)}
-                    title="Siirrä alas"
-                    className="text-[10px] leading-none text-muted hover:text-text disabled:opacity-20"
-                  >
-                    ▼
-                  </button>
-                </div>
+            {wealthAccounts.map((a) => (
+              <li
+                key={a.id}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setOverId(a.id);
+                }}
+                onDragLeave={() => setOverId((o) => (o === a.id ? null : o))}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  dropOn(a.id);
+                  setDragId(null);
+                  setOverId(null);
+                }}
+                className={cn(
+                  "flex items-center gap-2 rounded-md px-1 transition-colors",
+                  dragId === a.id && "opacity-40",
+                  overId === a.id && dragId !== a.id && "bg-accent/10",
+                )}
+              >
+                <span
+                  draggable
+                  onDragStart={(e) => {
+                    setDragId(a.id);
+                    e.dataTransfer.effectAllowed = "move";
+                    // Drag the whole row as the ghost image, not just the grip.
+                    const row = e.currentTarget.closest("li");
+                    if (row) e.dataTransfer.setDragImage(row, 16, 16);
+                  }}
+                  onDragEnd={() => {
+                    setDragId(null);
+                    setOverId(null);
+                  }}
+                  title="Raahaa järjestääksesi"
+                  className="cursor-grab select-none px-1 text-muted/60 hover:text-text active:cursor-grabbing"
+                >
+                  ⠿
+                </span>
                 <span className="min-w-0 flex-1 truncate text-sm text-text">
                   {a.name}
                 </span>

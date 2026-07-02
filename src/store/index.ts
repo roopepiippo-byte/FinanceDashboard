@@ -76,6 +76,7 @@ interface AppState {
   updateWealthAccount: (account: WealthAccount) => Promise<void>;
   removeWealthAccount: (id: string) => Promise<void>;
   moveWealthAccount: (id: string, direction: -1 | 1) => Promise<void>;
+  reorderWealthAccounts: (orderedIds: string[]) => Promise<void>;
   toggleCategoryVisibility: (category: string) => Promise<void>;
   setCategoryColor: (category: string, color: string) => Promise<void>;
   resetCategoryColors: () => Promise<void>;
@@ -376,6 +377,17 @@ export const useStore = create<AppState>((set, get) => ({
     if (i < 0 || j < 0 || j >= list.length) return;
     [list[i], list[j]] = [list[j], list[i]];
     const renumbered = list.map((a, idx) => ({ ...a, sortOrder: idx }));
+    await wealthAccountsRepo.bulkUpsert(renumbered);
+    set({ wealthAccounts: renumbered });
+  },
+
+  async reorderWealthAccounts(orderedIds) {
+    const byId = new Map(get().wealthAccounts.map((a) => [a.id, a]));
+    const renumbered = orderedIds
+      .map((id) => byId.get(id))
+      .filter((a): a is WealthAccount => a !== undefined)
+      .map((a, idx) => ({ ...a, sortOrder: idx }));
+    if (renumbered.length !== byId.size) return; // ids out of sync — ignore
     await wealthAccountsRepo.bulkUpsert(renumbered);
     set({ wealthAccounts: renumbered });
   },
