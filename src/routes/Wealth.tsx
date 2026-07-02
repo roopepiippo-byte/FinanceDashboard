@@ -10,7 +10,7 @@ import {
   LiquidChart,
   WealthSourceChart,
 } from "@/components/charts/WealthCharts";
-import { formatEur } from "@/domain/money";
+import { formatEur, parseEuroInputToCents } from "@/domain/money";
 import { formatMonthFi } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import {
@@ -29,11 +29,11 @@ const KIND_TITLES = {
 } as const;
 
 function toEuros(cents: number | undefined): string {
-  return cents ? String(Math.round(cents) / 100) : "";
+  if (!cents) return "";
+  return String(Math.round(cents) / 100).replace(".", ",");
 }
 function toCents(euros: string): number {
-  const n = Number(euros.replace(",", "."));
-  return Number.isFinite(n) ? Math.round(n * 100) : 0;
+  return parseEuroInputToCents(euros) ?? 0;
 }
 function currentMonth(): string {
   return new Date().toISOString().slice(0, 7);

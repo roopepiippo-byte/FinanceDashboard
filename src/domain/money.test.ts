@@ -7,6 +7,7 @@ import {
   pctOf,
   centsFromPct,
   parseFinnishAmountToCents,
+  parseEuroInputToCents,
   formatEur,
 } from "./money";
 
@@ -67,6 +68,27 @@ describe("parseFinnishAmountToCents", () => {
   it("throws on unparseable input", () => {
     expect(() => parseFinnishAmountToCents("abc")).toThrow();
     expect(() => parseFinnishAmountToCents("")).toThrow();
+  });
+});
+
+describe("parseEuroInputToCents", () => {
+  const NBSP = String.fromCharCode(0x00a0);
+  it("accepts plain, spaced, comma and mixed formats", () => {
+    expect(parseEuroInputToCents("5000")).toBe(500000);
+    expect(parseEuroInputToCents("12 500")).toBe(1250000);
+    expect(parseEuroInputToCents(`12${NBSP}500`)).toBe(1250000);
+    expect(parseEuroInputToCents("1 234,56")).toBe(123456);
+    expect(parseEuroInputToCents("1.234,56")).toBe(123456);
+    expect(parseEuroInputToCents("12000.50")).toBe(1200050);
+    expect(parseEuroInputToCents("12 500 €")).toBe(1250000);
+    expect(parseEuroInputToCents("-42,50")).toBe(-4250);
+  });
+
+  it("returns null for empty or garbage input", () => {
+    expect(parseEuroInputToCents("")).toBeNull();
+    expect(parseEuroInputToCents("   ")).toBeNull();
+    expect(parseEuroInputToCents("abc")).toBeNull();
+    expect(parseEuroInputToCents("-")).toBeNull();
   });
 });
 

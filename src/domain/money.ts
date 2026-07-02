@@ -64,6 +64,34 @@ export function parseFinnishAmountToCents(raw: string): number {
   return roundCents(value * 100);
 }
 
+/**
+ * Lenient euro input parser for form fields. Accepts what a Finnish user
+ * plausibly types or pastes: "5000", "12 500", "1 234,56", "1.234,56",
+ * "12000.50", "12 500 €". Returns integer cents, or null when the input
+ * is empty/unparseable (callers decide the fallback).
+ */
+export function parseEuroInputToCents(raw: string): number | null {
+  let s = raw
+    .replace(/€/g, "") // €
+    .replace(/\s/g, "") // spaces incl. nbsp thousands separators
+    .split(UNICODE_MINUS)
+    .join("-");
+  if (s === "" || s === "-") return null;
+
+  const hasComma = s.includes(",");
+  const hasDot = s.includes(".");
+  if (hasComma && hasDot) {
+    // "1.234,56": dots are thousands separators, comma is the decimal.
+    s = s.replace(/\./g, "").replace(",", ".");
+  } else if (hasComma) {
+    s = s.replace(",", ".");
+  }
+  // Only comma or dot as decimal — anything else is not a number.
+  const value = Number(s);
+  if (!Number.isFinite(value)) return null;
+  return roundCents(value * 100);
+}
+
 const eurFormatter = new Intl.NumberFormat("fi-FI", {
   style: "currency",
   currency: "EUR",
