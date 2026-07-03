@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useStore } from "@/store";
 import { transactionsInRange } from "@/store/selectors";
 import {
@@ -136,6 +137,21 @@ export function Dashboard() {
           spark={sparks.rate}
         />
       </div>
+
+      {(() => {
+        const excluded = categorySettings.filter((s) => !s.visible).length;
+        return excluded > 0 ? (
+          <p className="mt-2 text-xs text-muted">
+            {excluded} luokkaa jätetty pois laskuista —{" "}
+            <Link
+              to="/settings"
+              className="text-accent hover:underline"
+            >
+              muokkaa Asetuksissa
+            </Link>
+          </p>
+        ) : null;
+      })()}
 
       {/* Quick-spend cards */}
       <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">

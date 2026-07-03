@@ -287,3 +287,11 @@ text where they conflict.
    on Kojelauta, filtered totals + column sorting on Tapahtumat,
    month-vs-target budget meters, per-category color editing / quick-spend
    selection in Asetukset, CVD-validated default category palette.
+5. **No class-based exclusions** (supersedes the FR-013 note that transfers are
+   always excluded): the Asetukset category checkboxes are the ONLY mechanism
+   that excludes a category from Kojelauta charts and the
+   income–expense–savings calculations. Direction is decided by category class
+   where decisive (income → Tulot, expense → Kulut); included transfer-class
+   categories count by transaction sign. On upgrade, transfer-class categories
+   were toggled off once (one-time default) so numbers kept their previous
+   meaning; from then on the user's toggles rule.

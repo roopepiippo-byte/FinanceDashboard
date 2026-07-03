@@ -31,17 +31,35 @@ const data: Transaction[] = [
   tx({ amountCents: 300000, category: "Palkka", class: "income" }),
   tx({ amountCents: -50000, category: "Ruoka", class: "expense" }),
   tx({ amountCents: -20000, category: "Bensa", class: "expense" }),
-  tx({ amountCents: -100000, category: "Sijoitus", class: "transfer" }), // excluded
-  tx({ amountCents: -9999, category: "Salattu", class: "expense" }), // hidden
+  // Included transfer: counts by SIGN (no class-based exclusion).
+  tx({ amountCents: -100000, category: "Sijoitus", class: "transfer" }),
+  // Not in the visible set -> excluded by the Asetukset toggle.
+  tx({ amountCents: -9999, category: "Salattu", class: "expense" }),
 ];
 
 describe("computeKpis", () => {
-  it("computes income, expenses, net, savings rate (transfers/hidden excluded)", () => {
+  it("computes income/expenses/net; only the visibility toggle excludes", () => {
     const k = computeKpis(data, visible);
     expect(k.incomeCents).toBe(300000);
-    expect(k.expenseCents).toBe(70000); // 500 + 200 only
+    expect(k.expenseCents).toBe(170000); // 500 + 200 + 1000 (transfer by sign)
+    expect(k.netCents).toBe(130000);
+    expect(k.savingsRatePct).toBeCloseTo(43.3, 1);
+  });
+
+  it("excludes a transfer category when it is toggled off", () => {
+    const withoutSijoitus = new Set(["Palkka", "Ruoka", "Bensa"]);
+    const k = computeKpis(data, withoutSijoitus);
+    expect(k.expenseCents).toBe(70000);
     expect(k.netCents).toBe(230000);
-    expect(k.savingsRatePct).toBeCloseTo(76.7, 1);
+  });
+
+  it("counts a positive transfer as income by sign", () => {
+    const k = computeKpis(
+      [tx({ amountCents: 50000, category: "Sijoitus", class: "transfer" })],
+      visible,
+    );
+    expect(k.incomeCents).toBe(50000);
+    expect(k.expenseCents).toBe(0);
   });
 
   it("handles empty income without dividing by zero", () => {
@@ -56,9 +74,10 @@ describe("computeKpis", () => {
 });
 
 describe("categorySpend", () => {
-  it("aggregates expense magnitude per visible category, sorted desc", () => {
+  it("aggregates expense-direction magnitude per included category", () => {
     const spend = categorySpend(data, visible);
     expect(spend).toEqual([
+      { category: "Sijoitus", cents: 100000 },
       { category: "Ruoka", cents: 50000 },
       { category: "Bensa", cents: 20000 },
     ]);

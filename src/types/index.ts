@@ -115,4 +115,10 @@ export interface DisplaySettings {
   quickSpendCategories: string[];
   /** Whether the combined fuel+car chart is hidden (FR-015). */
   carChartHidden: boolean;
+  /**
+   * One-time default applied: when class-based exclusions were removed,
+   * transfer-class categories were toggled off once so dashboard numbers
+   * kept their previous meaning. After that, the user's toggles rule.
+   */
+  transferDefaultApplied?: boolean;
 }

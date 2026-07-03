@@ -144,7 +144,7 @@ export const useStore = create<AppState>((set, get) => ({
       categoryMap,
       overrides,
       customCategories,
-      settings,
+      loadedSettings,
       budget,
     ] = await Promise.all([
       transactionsRepo.getAll(),
@@ -169,6 +169,27 @@ export const useStore = create<AppState>((set, get) => ({
         color: c.color,
       }));
       await categorySettingsRepo.bulkSave(categorySettings);
+    }
+
+    // One-time default when class-based exclusions were removed: toggle
+    // transfer-class categories off so the dashboard numbers keep their
+    // previous meaning. From here on the Asetukset toggles alone decide.
+    let settings = loadedSettings;
+    if (!settings.transferDefaultApplied) {
+      const transferNames = new Set([
+        ...BUILTIN_CATEGORIES.filter((c) => c.class === "transfer").map(
+          (c) => c.name,
+        ),
+        ...customCategories
+          .filter((c) => c.class === "transfer")
+          .map((c) => c.name),
+      ]);
+      categorySettings = categorySettings.map((s) =>
+        transferNames.has(s.category) ? { ...s, visible: false } : s,
+      );
+      await categorySettingsRepo.bulkSave(categorySettings);
+      settings = { ...settings, transferDefaultApplied: true };
+      await settingsRepo.save(settings);
     }
 
     set({

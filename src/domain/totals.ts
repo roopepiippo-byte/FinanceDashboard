@@ -8,15 +8,28 @@ export interface Kpis {
   savingsRatePct: number;
 }
 
-/** Only visible, categorized transactions participate (FR-028). */
+/**
+ * Only included (visible), categorized transactions participate (FR-028).
+ * There are NO class-based exclusions: the visibility toggles in Asetukset
+ * are the single mechanism for leaving categories out of the calculations.
+ */
 function isCounted(t: Transaction, visible: Set<string>): boolean {
   return t.category !== null && visible.has(t.category);
 }
 
 /**
- * Income/expense/net/savings-rate KPIs (FR-013). Income = income-class sums,
- * expenses = expense-class magnitude; transfers and uncategorized excluded.
+ * Which side of the ledger a transaction lands on: its category class where
+ * decisive, otherwise (transfer/unknown class) the sign of the amount.
+ * Keeps refunds inside their expense category while letting included
+ * transfer categories count in the natural direction.
  */
+export function flowDirection(t: Transaction): "income" | "expense" {
+  if (t.class === "income") return "income";
+  if (t.class === "expense") return "expense";
+  return t.amountCents >= 0 ? "income" : "expense";
+}
+
+/** Income/expense/net/savings-rate KPIs (FR-013) over included categories. */
 export function computeKpis(
   txns: Transaction[],
   visible: Set<string>,
@@ -25,8 +38,8 @@ export function computeKpis(
   let expenseCents = 0;
   for (const t of txns) {
     if (!isCounted(t, visible)) continue;
-    if (t.class === "income") incomeCents += t.amountCents;
-    else if (t.class === "expense") expenseCents += -t.amountCents;
+    if (flowDirection(t) === "income") incomeCents += t.amountCents;
+    else expenseCents += -t.amountCents;
   }
   const netCents = incomeCents - expenseCents;
   const savingsRatePct =
@@ -41,7 +54,7 @@ export interface CategorySpend {
   cents: number; // positive magnitude
 }
 
-/** Expense spend per category (donut + quick-spend), visible only. */
+/** Expense-direction spend per category (donut + quick-spend), included only. */
 export function categorySpend(
   txns: Transaction[],
   visible: Set<string>,
@@ -49,11 +62,12 @@ export function categorySpend(
   const map = new Map<string, number>();
   for (const t of txns) {
     if (!isCounted(t, visible)) continue;
-    if (t.class !== "expense") continue;
+    if (flowDirection(t) !== "expense") continue;
     map.set(t.category!, (map.get(t.category!) ?? 0) + -t.amountCents);
   }
   return [...map.entries()]
     .map(([category, cents]) => ({ category, cents }))
+    .filter((c) => c.cents > 0)
     .sort((a, b) => b.cents - a.cents);
 }
 
@@ -64,7 +78,7 @@ export function spendForCategory(
 ): number {
   let cents = 0;
   for (const t of txns) {
-    if (t.category === category && t.class === "expense") {
+    if (t.category === category && flowDirection(t) === "expense") {
       cents += -t.amountCents;
     }
   }
@@ -86,10 +100,9 @@ export function monthlyFlows(
   const byMonth = new Map<string, { income: number; expense: number }>();
   for (const t of txns) {
     if (!isCounted(t, visible)) continue;
-    if (t.class !== "income" && t.class !== "expense") continue;
     const m = monthOf(t.date);
     const row = byMonth.get(m) ?? { income: 0, expense: 0 };
-    if (t.class === "income") row.income += t.amountCents;
+    if (flowDirection(t) === "income") row.income += t.amountCents;
     else row.expense += -t.amountCents;
     byMonth.set(m, row);
   }
@@ -119,7 +132,7 @@ export function topMerchants(
   const map = new Map<string, MerchantSpend>();
   for (const t of txns) {
     if (!isCounted(t, visible)) continue;
-    if (t.class !== "expense") continue;
+    if (flowDirection(t) !== "expense") continue;
     const row = map.get(t.merchantLower);
     if (row) {
       row.count += 1;

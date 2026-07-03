@@ -1,8 +1,9 @@
 import type { Transaction } from "@/types";
 import { monthOf } from "@/lib/format";
 import { divideCents, centsFromPct, pctOf } from "@/domain/money";
+import { flowDirection } from "@/domain/totals";
 
-/** Only visible, categorized transactions participate (FR-028). */
+/** Only included (visible), categorized transactions participate (FR-028). */
 function isCounted(t: Transaction, visible: Set<string>): boolean {
   return t.category !== null && visible.has(t.category);
 }
@@ -23,7 +24,7 @@ export function avgMonthlyIncomeCents(
   let income = 0;
   for (const t of txns) {
     if (!isCounted(t, visible)) continue;
-    if (t.class === "income" && recent.has(monthOf(t.date))) {
+    if (flowDirection(t) === "income" && recent.has(monthOf(t.date))) {
       income += t.amountCents;
     }
   }
@@ -57,8 +58,10 @@ export function budgetHistory(
   for (const t of txns) {
     if (!isCounted(t, visible)) continue;
     const m = monthOf(t.date);
-    if (t.class === "income" && m === lastMonth) lastMonthIncome += t.amountCents;
-    if (t.class !== "expense") continue;
+    if (flowDirection(t) === "income") {
+      if (m === lastMonth) lastMonthIncome += t.amountCents;
+      continue;
+    }
     if (recentMonths.has(m)) {
       recentByCat.set(t.category!, (recentByCat.get(t.category!) ?? 0) - t.amountCents);
     }
@@ -101,7 +104,7 @@ export function monthSpendByCategory(
   const map = new Map<string, number>();
   for (const t of txns) {
     if (!isCounted(t, visible)) continue;
-    if (t.class !== "expense" || monthOf(t.date) !== month) continue;
+    if (flowDirection(t) !== "expense" || monthOf(t.date) !== month) continue;
     map.set(t.category!, (map.get(t.category!) ?? 0) - t.amountCents);
   }
   return map;

@@ -339,7 +339,7 @@ export function Settings() {
       {/* Category settings */}
       <Card className="mb-4">
         <div className="flex items-center justify-between">
-          <CardTitle>Luokat</CardTitle>
+          <CardTitle>Luokat ja laskentaan sisällytys</CardTitle>
           <Button
             variant="ghost"
             size="sm"
@@ -351,6 +351,11 @@ export function Settings() {
             Palauta oletusvärit
           </Button>
         </div>
+        <p className="mt-2 text-sm text-muted">
+          Rastilla valitset, mitkä luokat ovat mukana Kojelautan kaavioissa ja
+          tulot–kulut–säästöaste-laskelmissa. Ilman rastia luokka jätetään
+          kokonaan pois laskuista (esim. siirrot omille tileille).
+        </p>
         <div className="mt-3 flex flex-wrap items-end gap-2 border-b border-border pb-4">
           <input
             value={newCat}
@@ -388,31 +393,42 @@ export function Settings() {
           {categories.map((c) => (
             <div
               key={c.name}
-              className="flex items-center gap-2 rounded-md border border-border px-2 py-1"
+              className={cn(
+                "flex items-center gap-2 rounded-md border px-2 py-1.5 transition-colors",
+                c.visible
+                  ? "border-border"
+                  : "border-border/50 bg-bg/50 opacity-60",
+              )}
             >
+              <input
+                type="checkbox"
+                checked={c.visible}
+                onChange={() => void toggleCategoryVisibility(c.name)}
+                title={
+                  c.visible ? "Jätä pois laskuista" : "Sisällytä laskelmiin"
+                }
+                className="h-4 w-4 shrink-0 cursor-pointer accent-[var(--color-accent)]"
+              />
               <input
                 type="color"
                 value={c.color}
                 onChange={(e) => void setCategoryColor(c.name, e.target.value)}
                 title="Vaihda väri"
                 className="h-5 w-5 shrink-0 cursor-pointer appearance-none rounded-full border-0 bg-transparent p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-full [&::-webkit-color-swatch]:border-0"
-                style={{ opacity: c.visible ? 1 : 0.3 }}
               />
-              <button
-                onClick={() => void toggleCategoryVisibility(c.name)}
+              <span
                 className={cn(
-                  "min-w-0 flex-1 truncate text-left text-sm",
-                  c.visible ? "text-text" : "text-muted/50 line-through",
+                  "min-w-0 flex-1 truncate text-sm",
+                  c.visible ? "text-text" : "text-muted line-through",
                 )}
-                title={c.visible ? "Piilota" : "Näytä"}
               >
                 {c.name}
-              </button>
+              </span>
             </div>
           ))}
         </div>
         <p className="mt-2 text-xs text-muted">
-          Nimeä klikkaamalla piilotat/näytät luokan; väripallosta vaihdat värin.
+          Väripallosta vaihdat luokan värin kaavioissa.
         </p>
       </Card>
 
