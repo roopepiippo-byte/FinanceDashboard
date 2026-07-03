@@ -11,6 +11,8 @@ interface CategoryDonutProps {
   data: CategorySpend[];
   colorOf: (category: string) => string;
   onSelect?: (category: string) => void;
+  /** Audit drill for the "Muut pienet" fold — receives the tail categories. */
+  onSelectTail?: (categories: string[]) => void;
 }
 
 const MAX_SLICES = 7;
@@ -22,7 +24,12 @@ const FOLD_COLOR = "#5c6577";
  * hero total in the center, and a value-labeled category list that is also the
  * drill-down control — values are readable without hovering.
  */
-export function CategoryDonut({ data, colorOf, onSelect }: CategoryDonutProps) {
+export function CategoryDonut({
+  data,
+  colorOf,
+  onSelect,
+  onSelectTail,
+}: CategoryDonutProps) {
   const [active, setActive] = useState<string | null>(null);
 
   const view = useMemo(() => {
@@ -35,7 +42,12 @@ export function CategoryDonut({ data, colorOf, onSelect }: CategoryDonutProps) {
         ? [{ key: FOLD_KEY, cents: sumCents(tail.map((d) => d.cents)) }]
         : []),
     ];
-    return { total, slices, tailCount: tail.length };
+    return {
+      total,
+      slices,
+      tailCount: tail.length,
+      tailCategories: tail.map((d) => d.category),
+    };
   }, [data]);
 
   if (data.length === 0) {
@@ -68,7 +80,9 @@ export function CategoryDonut({ data, colorOf, onSelect }: CategoryDonutProps) {
               strokeWidth={2}
               onClick={(_s, index) => {
                 const key = view.slices[index]?.key;
-                if (key && key !== FOLD_KEY) onSelect?.(key);
+                if (!key) return;
+                if (key === FOLD_KEY) onSelectTail?.(view.tailCategories);
+                else onSelect?.(key);
               }}
               onMouseEnter={(_s, index) =>
                 setActive(view.slices[index]?.key ?? null)
@@ -109,13 +123,17 @@ export function CategoryDonut({ data, colorOf, onSelect }: CategoryDonutProps) {
           return (
             <li key={s.key}>
               <button
-                disabled={isFold || !onSelect}
-                onClick={() => onSelect?.(s.key)}
+                disabled={isFold ? !onSelectTail : !onSelect}
+                onClick={() =>
+                  isFold
+                    ? onSelectTail?.(view.tailCategories)
+                    : onSelect?.(s.key)
+                }
                 onMouseEnter={() => setActive(s.key)}
                 onMouseLeave={() => setActive(null)}
                 className={cn(
                   "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors",
-                  !isFold && onSelect && "hover:bg-bg",
+                  (isFold ? onSelectTail : onSelect) && "hover:bg-bg",
                   active === s.key && "bg-bg",
                 )}
               >

@@ -8,16 +8,20 @@ import {
   spendForCategory,
   monthlyFlows,
   topMerchants,
+  flowDirection,
   type MonthlyFlow,
 } from "@/domain/totals";
 import { formatEur } from "@/domain/money";
-import { formatDateFi, formatNumberFi, monthOf } from "@/lib/format";
+import { formatNumberFi, formatMonthFi, monthOf } from "@/lib/format";
 import { priorYearRange } from "@/lib/dateRange";
 import { Card, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { TrendChart } from "@/components/charts/TrendChart";
 import { CategoryDonut } from "@/components/charts/CategoryDonut";
 import { CarChart, type CarPoint } from "@/components/charts/CarChart";
+import {
+  TransactionsDrawer,
+  type AuditQuery,
+} from "@/components/TransactionsDrawer";
 import { cn } from "@/lib/cn";
 
 interface Delta {
@@ -38,13 +42,17 @@ export function Dashboard() {
   const settings = useStore((s) => s.settings);
   const categorySettings = useStore((s) => s.categorySettings);
 
-  const [drill, setDrill] = useState<string | null>(null);
+  const [audit, setAudit] = useState<AuditQuery | null>(null);
 
   const view = useMemo(() => {
     const visible = new Set(
       categorySettings.filter((s) => s.visible).map((s) => s.category),
     );
     const txns = transactionsInRange(transactions, range);
+    // The audit base: exactly the rows the KPI math counts.
+    const included = txns.filter(
+      (t) => t.category !== null && visible.has(t.category),
+    );
     const prior = transactionsInRange(transactions, priorYearRange(range));
     const kpis = computeKpis(txns, visible);
     const priorKpis = computeKpis(prior, visible);
@@ -68,7 +76,7 @@ export function Dashboard() {
       cents: spendForCategory(txns, c),
     }));
 
-    return { txns, kpis, priorKpis, spend, monthly, carData, quickSpend, merchants };
+    return { txns, included, kpis, priorKpis, spend, monthly, carData, quickSpend, merchants };
   }, [transactions, range, settings.quickSpendCategories, categorySettings]);
 
   const colorMap = useMemo(() => {
@@ -76,7 +84,65 @@ export function Dashboard() {
     return (name: string) => m.get(name) ?? "#94a3b8";
   }, [categorySettings]);
 
-  const { kpis, priorKpis, monthly } = view;
+  const { kpis, priorKpis } = view;
+
+  /* ---- Audit queries (drill-downs) ---- */
+  const openIncome = () =>
+    setAudit({
+      title: "Tulot — mukana olevat tapahtumat",
+      txns: view.included.filter((t) => flowDirection(t) === "income"),
+    });
+  const openExpense = () =>
+    setAudit({
+      title: "Kulut — mukana olevat tapahtumat",
+      txns: view.included.filter((t) => flowDirection(t) === "expense"),
+    });
+  const openNet = () =>
+    setAudit({
+      title: "Netto — kaikki mukana olevat tapahtumat",
+      txns: view.included,
+    });
+  const openCategory = (category: string) =>
+    setAudit({
+      title: category,
+      txns: view.included.filter(
+        (t) => t.category === category && flowDirection(t) === "expense",
+      ),
+    });
+  const openTail = (categories: string[]) =>
+    setAudit({
+      title: `Muut pienet (${categories.length} luokkaa)`,
+      txns: view.included.filter(
+        (t) =>
+          t.category !== null &&
+          categories.includes(t.category) &&
+          flowDirection(t) === "expense",
+      ),
+    });
+  const openMonth = (month: string, dir: "income" | "expense") =>
+    setAudit({
+      title: `${dir === "income" ? "Tulot" : "Kulut"} — ${formatMonthFi(month)}`,
+      txns: view.included.filter(
+        (t) => monthOf(t.date) === month && flowDirection(t) === dir,
+      ),
+    });
+  const openCarMonth = (month: string) =>
+    setAudit({
+      title: `Bensa + Auto — ${formatMonthFi(month)}`,
+      txns: view.txns.filter(
+        (t) =>
+          monthOf(t.date) === month &&
+          (t.category === "Bensa" || t.category === "Auto") &&
+          t.class === "expense",
+      ),
+    });
+  const openMerchant = (merchantLower: string, merchant: string) =>
+    setAudit({
+      title: merchant,
+      txns: view.included.filter(
+        (t) => t.merchantLower === merchantLower && flowDirection(t) === "expense",
+      ),
+    });
 
   const savingsDelta: Delta = (() => {
     const diff =
@@ -89,14 +155,14 @@ export function Dashboard() {
 
   const sparks = useMemo(
     () => ({
-      income: monthly.map((m: MonthlyFlow) => m.incomeCents),
-      expense: monthly.map((m: MonthlyFlow) => m.expenseCents),
-      net: monthly.map((m: MonthlyFlow) => m.netCents),
-      rate: monthly.map((m: MonthlyFlow) =>
+      income: view.monthly.map((m: MonthlyFlow) => m.incomeCents),
+      expense: view.monthly.map((m: MonthlyFlow) => m.expenseCents),
+      net: view.monthly.map((m: MonthlyFlow) => m.netCents),
+      rate: view.monthly.map((m: MonthlyFlow) =>
         m.incomeCents > 0 ? (m.netCents / m.incomeCents) * 100 : 0,
       ),
     }),
-    [monthly],
+    [view.monthly],
   );
 
   if (view.txns.length === 0) {
@@ -110,25 +176,28 @@ export function Dashboard() {
 
   return (
     <div>
-      {/* KPI stat tiles */}
+      {/* KPI stat tiles — click to audit */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi
           title="Tulot"
           value={formatEur(kpis.incomeCents)}
           delta={moneyDelta(kpis.incomeCents, priorKpis.incomeCents, true)}
           spark={sparks.income}
+          onClick={openIncome}
         />
         <Kpi
           title="Kulut"
           value={formatEur(kpis.expenseCents)}
           delta={moneyDelta(kpis.expenseCents, priorKpis.expenseCents, false)}
           spark={sparks.expense}
+          onClick={openExpense}
         />
         <Kpi
           title="Netto"
           value={formatEur(kpis.netCents)}
           delta={moneyDelta(kpis.netCents, priorKpis.netCents, true)}
           spark={sparks.net}
+          onClick={openNet}
         />
         <Kpi
           title="Säästöaste"
@@ -143,23 +212,25 @@ export function Dashboard() {
         return excluded > 0 ? (
           <p className="mt-2 text-xs text-muted">
             {excluded} luokkaa jätetty pois laskuista —{" "}
-            <Link
-              to="/settings"
-              className="text-accent hover:underline"
-            >
+            <Link to="/settings" className="text-accent hover:underline">
               muokkaa Asetuksissa
             </Link>
           </p>
         ) : null;
       })()}
 
-      {/* Quick-spend cards */}
+      {/* Quick-spend cards — click to audit */}
       <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
         {view.quickSpend.map((q) => {
           const share =
             kpis.expenseCents > 0 ? (q.cents / kpis.expenseCents) * 100 : 0;
           return (
-            <Card key={q.category} className="py-4">
+            <Card
+              key={q.category}
+              className="cursor-pointer py-4 transition-colors hover:border-accent/50"
+              onClick={() => openCategory(q.category)}
+              title="Näytä tapahtumat"
+            >
               <div className="flex items-center gap-2">
                 <span
                   className="h-2.5 w-2.5 rounded-full"
@@ -183,7 +254,7 @@ export function Dashboard() {
         <Card>
           <CardTitle>Kassavirta kuukausittain</CardTitle>
           <div className="mt-3">
-            <TrendChart data={view.monthly} />
+            <TrendChart data={view.monthly} onSelectMonth={openMonth} />
           </div>
         </Card>
         <Card>
@@ -192,7 +263,8 @@ export function Dashboard() {
             <CategoryDonut
               data={view.spend}
               colorOf={colorMap}
-              onSelect={setDrill}
+              onSelect={openCategory}
+              onSelectTail={openTail}
             />
           </div>
         </Card>
@@ -203,7 +275,7 @@ export function Dashboard() {
           <Card>
             <CardTitle>Bensa + Auto</CardTitle>
             <div className="mt-3">
-              <CarChart data={view.carData} />
+              <CarChart data={view.carData} onSelectMonth={openCarMonth} />
             </div>
           </Card>
         )}
@@ -215,7 +287,9 @@ export function Dashboard() {
                 {view.merchants.map((m, i) => (
                   <tr
                     key={m.merchantLower}
-                    className="border-b border-border last:border-0"
+                    className="cursor-pointer border-b border-border transition-colors last:border-0 hover:bg-card-2"
+                    onClick={() => openMerchant(m.merchantLower, m.merchant)}
+                    title="Näytä tapahtumat"
                   >
                     <td className="w-6 py-1.5 pr-2 text-xs tabular-nums text-muted/60">
                       {i + 1}
@@ -237,44 +311,8 @@ export function Dashboard() {
         )}
       </div>
 
-      {/* Donut drill-down */}
-      {drill && (
-        <Card className="mt-4">
-          <div className="mb-3 flex items-center justify-between">
-            <CardTitle>Tapahtumat: {drill}</CardTitle>
-            <Button variant="ghost" size="sm" onClick={() => setDrill(null)}>
-              Sulje
-            </Button>
-          </div>
-          <div className="max-h-72 overflow-y-auto">
-            <table className="w-full text-sm">
-              <tbody>
-                {view.txns
-                  .filter((t) => t.category === drill)
-                  .sort((a, b) => b.date.localeCompare(a.date))
-                  .map((t) => (
-                    <tr
-                      key={t.id}
-                      className="border-b border-border last:border-0"
-                    >
-                      <td className="py-2 pr-4 text-muted">
-                        {formatDateFi(t.date)}
-                      </td>
-                      <td className="py-2 pr-4 text-text">{t.merchant}</td>
-                      <td
-                        className={cn(
-                          "py-2 text-right tabular-nums",
-                          t.amountCents < 0 ? "text-red" : "text-green",
-                        )}
-                      >
-                        {formatEur(t.amountCents)}
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+      {audit && (
+        <TransactionsDrawer query={audit} onClose={() => setAudit(null)} />
       )}
     </div>
   );
@@ -322,14 +360,23 @@ function Kpi({
   value,
   delta,
   spark,
+  onClick,
 }: {
   title: string;
   value: string;
   delta: Delta | null;
   spark?: number[];
+  onClick?: () => void;
 }) {
   return (
-    <Card className="py-4">
+    <Card
+      className={cn(
+        "py-4",
+        onClick && "cursor-pointer transition-colors hover:border-accent/50",
+      )}
+      onClick={onClick}
+      title={onClick ? "Näytä tapahtumat" : undefined}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <CardTitle>{title}</CardTitle>
@@ -344,9 +391,7 @@ function Kpi({
           <span
             className={cn(
               "rounded-full px-1.5 py-0.5 font-medium",
-              delta.good
-                ? "bg-green/10 text-green"
-                : "bg-red/10 text-red",
+              delta.good ? "bg-green/10 text-green" : "bg-red/10 text-red",
             )}
           >
             {delta.text}

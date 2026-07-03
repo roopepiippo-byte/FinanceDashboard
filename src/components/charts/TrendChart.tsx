@@ -27,7 +27,14 @@ const NAMES: Record<string, string> = {
 };
 
 /** Monthly cash flow: income vs. expense bars with a net line (one € axis). */
-export function TrendChart({ data }: { data: MonthlyFlow[] }) {
+export function TrendChart({
+  data,
+  onSelectMonth,
+}: {
+  data: MonthlyFlow[];
+  /** Audit drill: a month bar was clicked. */
+  onSelectMonth?: (month: string, dir: "income" | "expense") => void;
+}) {
   return (
     <ResponsiveContainer width="100%" height={300}>
       <ComposedChart
@@ -60,12 +67,20 @@ export function TrendChart({ data }: { data: MonthlyFlow[] }) {
           fill={CHART_COLORS.green}
           maxBarSize={18}
           radius={[4, 4, 0, 0]}
+          cursor={onSelectMonth ? "pointer" : undefined}
+          onClick={(d: { payload?: MonthlyFlow }) => {
+            if (d?.payload?.month) onSelectMonth?.(d.payload.month, "income");
+          }}
         />
         <Bar
           dataKey="expenseCents"
           fill={CHART_COLORS.red}
           maxBarSize={18}
           radius={[4, 4, 0, 0]}
+          cursor={onSelectMonth ? "pointer" : undefined}
+          onClick={(d: { payload?: MonthlyFlow }) => {
+            if (d?.payload?.month) onSelectMonth?.(d.payload.month, "expense");
+          }}
         />
         <Line
           type="monotone"

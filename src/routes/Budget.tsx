@@ -1,10 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { useStore } from "@/store";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatEur } from "@/domain/money";
-import { formatNumberFi } from "@/lib/format";
+import { formatNumberFi, monthOf, formatMonthFi } from "@/lib/format";
 import {
   avgMonthlyIncomeCents,
   budgetHistory,
@@ -14,6 +14,11 @@ import {
   monthSpendByCategory,
 } from "@/domain/budget";
 import { cn } from "@/lib/cn";
+import { flowDirection } from "@/domain/totals";
+import {
+  TransactionsDrawer,
+  type AuditQuery,
+} from "@/components/TransactionsDrawer";
 import type { Budget as BudgetType } from "@/types";
 
 export function Budget() {
@@ -38,7 +43,9 @@ export function Budget() {
     [transactions, visible],
   );
 
+  const [audit, setAudit] = useState<AuditQuery | null>(null);
   const thisMonth = new Date().toISOString().slice(0, 7);
+
   const monthMeters = useMemo(() => {
     const spend = monthSpendByCategory(transactions, visible, thisMonth);
     return Object.entries(budget.categories)
@@ -51,6 +58,19 @@ export function Budget() {
       }))
       .sort((a, b) => b.ratio - a.ratio);
   }, [transactions, visible, budget.categories, thisMonth]);
+
+  function openMeter(category: string) {
+    setAudit({
+      title: `${category} — ${formatMonthFi(thisMonth)}`,
+      txns: transactions.filter(
+        (t) =>
+          t.category === category &&
+          visible.has(t.category) &&
+          monthOf(t.date) === thisMonth &&
+          flowDirection(t) === "expense",
+      ),
+    });
+  }
 
   function update(next: Partial<BudgetType>) {
     void saveBudget({ ...budget, ...next });
@@ -131,7 +151,12 @@ export function Budget() {
               const over = m.ratio > 1;
               const near = m.ratio > 0.8 && m.ratio <= 1;
               return (
-                <div key={m.category}>
+                <button
+                  key={m.category}
+                  onClick={() => openMeter(m.category)}
+                  title="Näytä kuukauden tapahtumat"
+                  className="block w-full rounded-md text-left transition-colors hover:bg-card-2"
+                >
                   <div className="mb-1 flex items-baseline justify-between text-sm">
                     <span className="text-text">{m.category}</span>
                     <span className="tabular-nums text-xs text-muted">
@@ -163,7 +188,7 @@ export function Budget() {
                       style={{ width: `${pct}%` }}
                     />
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -300,6 +325,10 @@ export function Budget() {
           </div>
         </Card>
       </div>
+
+      {audit && (
+        <TransactionsDrawer query={audit} onClose={() => setAudit(null)} />
+      )}
     </div>
   );
 }

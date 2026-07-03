@@ -6,6 +6,10 @@ import { CategorySelect } from "@/components/CategorySelect";
 import { CategoryCell } from "@/components/CategoryCell";
 import { categoryClassOf } from "@/store/selectors";
 import { createSuggester, type Suggestion } from "@/domain/suggest";
+import {
+  TransactionsDrawer,
+  type AuditQuery,
+} from "@/components/TransactionsDrawer";
 import { formatEur, sumCents } from "@/domain/money";
 import { cn } from "@/lib/cn";
 
@@ -25,6 +29,7 @@ export function Unmapped() {
   const applyMerchantCategory = useStore((s) => s.applyMerchantCategory);
   const toast = useToast();
   const [tab, setTab] = useState<Tab>("unmapped");
+  const [audit, setAudit] = useState<AuditQuery | null>(null);
 
   const groups = useMemo<MerchantGroup[]>(() => {
     const map = new Map<string, Omit<MerchantGroup, "suggestion">>();
@@ -101,7 +106,24 @@ export function Unmapped() {
                     key={g.merchantLower}
                     className="border-b border-border transition-colors last:border-0 hover:bg-card-2"
                   >
-                    <td className="px-4 py-3 text-text">{g.merchant}</td>
+                    <td className="px-4 py-3">
+                      <button
+                        className="text-left text-text hover:text-accent hover:underline"
+                        title="Näytä tapahtumat"
+                        onClick={() =>
+                          setAudit({
+                            title: `${g.merchant} — luokittelematta`,
+                            txns: transactions.filter(
+                              (t) =>
+                                t.merchantLower === g.merchantLower &&
+                                t.category === null,
+                            ),
+                          })
+                        }
+                      >
+                        {g.merchant}
+                      </button>
+                    </td>
                     <td className="px-4 py-3 tabular-nums text-muted">
                       {g.count}
                     </td>
@@ -194,6 +216,10 @@ export function Unmapped() {
             </span>
           </div>
         </Card>
+      )}
+
+      {audit && (
+        <TransactionsDrawer query={audit} onClose={() => setAudit(null)} />
       )}
     </div>
   );

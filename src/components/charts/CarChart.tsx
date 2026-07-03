@@ -23,7 +23,14 @@ export interface CarPoint {
 }
 
 /** Combined fuel (Bensa) + car (Auto) spend over time (FR-015). */
-export function CarChart({ data }: { data: CarPoint[] }) {
+export function CarChart({
+  data,
+  onSelectMonth,
+}: {
+  data: CarPoint[];
+  /** Audit drill: a month bar was clicked. */
+  onSelectMonth?: (month: string) => void;
+}) {
   return (
     <ResponsiveContainer width="100%" height={220}>
       <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
@@ -42,6 +49,10 @@ export function CarChart({ data }: { data: CarPoint[] }) {
           fill="#d95926"
           maxBarSize={22}
           radius={[4, 4, 0, 0]}
+          cursor={onSelectMonth ? "pointer" : undefined}
+          onClick={(d: { payload?: CarPoint }) => {
+            if (d?.payload?.month) onSelectMonth?.(d.payload.month);
+          }}
         />
       </BarChart>
     </ResponsiveContainer>
