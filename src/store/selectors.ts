@@ -26,7 +26,9 @@ export function selectCategories(): CategoryMeta[] {
     const setting = settingByName.get(name);
     return {
       name,
-      class: builtinClassOf(name) ?? customClass.get(name) ?? "expense",
+      // The user's class choice (Asetukset) wins over built-in/custom default.
+      class:
+        setting?.class ?? builtinClassOf(name) ?? customClass.get(name) ?? "expense",
       color: setting?.color ?? "#94a3b8",
       visible: setting?.visible ?? true,
     };
@@ -34,8 +36,9 @@ export function selectCategories(): CategoryMeta[] {
 }
 
 export function categoryClassOf(name: string): CategoryClass {
-  const { customCategories } = useStore.getState();
+  const { categorySettings, customCategories } = useStore.getState();
   return (
+    categorySettings.find((s) => s.category === name)?.class ??
     builtinClassOf(name) ??
     customCategories.find((c) => c.name === name)?.class ??
     "expense"

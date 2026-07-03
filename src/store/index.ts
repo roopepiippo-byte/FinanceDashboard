@@ -33,7 +33,7 @@ import {
   defaultColorOf,
   groupFromClass,
 } from "@/domain/categories";
-import { resolveAll } from "@/domain/categorize";
+import { resolveAll, applyClassOverrides } from "@/domain/categorize";
 import { mapNordeaCsv } from "@/domain/csv/mapNordea";
 import {
   parseCategoryDbCsv,
@@ -79,6 +79,7 @@ interface AppState {
   reorderWealthAccounts: (orderedIds: string[]) => Promise<void>;
   toggleCategoryVisibility: (category: string) => Promise<void>;
   setCategoryColor: (category: string, color: string) => Promise<void>;
+  setCategoryClass: (category: string, cls: CategoryClass) => Promise<void>;
   resetCategoryColors: () => Promise<void>;
   setQuickSpend: (categories: string[]) => Promise<void>;
   setCarChartHidden: (hidden: boolean) => Promise<void>;
@@ -118,8 +119,14 @@ function recompute(
   raw: Transaction[],
   map: CategoryMapEntry[],
   overrides: Override[],
+  categorySettings: CategorySetting[],
 ): Transaction[] {
-  return resolveAll(raw, map, overrides);
+  const classOverrides = new Map(
+    categorySettings
+      .filter((s) => s.class)
+      .map((s) => [s.category, s.class!] as const),
+  );
+  return applyClassOverrides(resolveAll(raw, map, overrides), classOverrides);
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -195,7 +202,12 @@ export const useStore = create<AppState>((set, get) => ({
     set({
       hydrated: true,
       rawTransactions,
-      transactions: recompute(rawTransactions, categoryMap, overrides),
+      transactions: recompute(
+        rawTransactions,
+        categoryMap,
+        overrides,
+        categorySettings,
+      ),
       importedFiles,
       categoryMap,
       overrides,
@@ -238,7 +250,7 @@ export const useStore = create<AppState>((set, get) => ({
     set({
       rawTransactions,
       importedFiles,
-      transactions: recompute(rawTransactions, categoryMap, overrides),
+      transactions: recompute(rawTransactions, categoryMap, overrides, get().categorySettings),
     });
 
     return { filename, added, duplicates: mapped.length - added, errors };
@@ -253,7 +265,7 @@ export const useStore = create<AppState>((set, get) => ({
     set({
       rawTransactions,
       importedFiles,
-      transactions: recompute(rawTransactions, categoryMap, overrides),
+      transactions: recompute(rawTransactions, categoryMap, overrides, get().categorySettings),
     });
   },
 
@@ -274,7 +286,7 @@ export const useStore = create<AppState>((set, get) => ({
     ];
     set({
       categoryMap,
-      transactions: recompute(rawTransactions, categoryMap, overrides),
+      transactions: recompute(rawTransactions, categoryMap, overrides, get().categorySettings),
     });
   },
 
@@ -312,7 +324,7 @@ export const useStore = create<AppState>((set, get) => ({
       categoryMap,
       categorySettings,
       customCategories: custom,
-      transactions: recompute(rawTransactions, categoryMap, overrides),
+      transactions: recompute(rawTransactions, categoryMap, overrides, get().categorySettings),
     });
 
     return {
@@ -332,7 +344,7 @@ export const useStore = create<AppState>((set, get) => ({
     const { rawTransactions, categoryMap } = get();
     set({
       overrides,
-      transactions: recompute(rawTransactions, categoryMap, overrides),
+      transactions: recompute(rawTransactions, categoryMap, overrides, get().categorySettings),
     });
   },
 
@@ -345,7 +357,7 @@ export const useStore = create<AppState>((set, get) => ({
     set({
       rawTransactions,
       overrides,
-      transactions: recompute(rawTransactions, categoryMap, overrides),
+      transactions: recompute(rawTransactions, categoryMap, overrides, get().categorySettings),
     });
   },
 
@@ -430,6 +442,26 @@ export const useStore = create<AppState>((set, get) => ({
     set({ categorySettings: await categorySettingsRepo.getAll() });
   },
 
+  async setCategoryClass(category, cls) {
+    const current = get().categorySettings.find((s) => s.category === category);
+    await categorySettingsRepo.save(
+      current
+        ? { ...current, class: cls }
+        : { category, visible: true, color: "#94a3b8", class: cls },
+    );
+    const categorySettings = await categorySettingsRepo.getAll();
+    const { rawTransactions, categoryMap, overrides } = get();
+    set({
+      categorySettings,
+      transactions: recompute(
+        rawTransactions,
+        categoryMap,
+        overrides,
+        categorySettings,
+      ),
+    });
+  },
+
   async resetCategoryColors() {
     const updated = get().categorySettings.map((s) => {
       const def = defaultColorOf(s.category);
@@ -487,7 +519,7 @@ export const useStore = create<AppState>((set, get) => ({
     const { rawTransactions, overrides } = get();
     set({
       categoryMap: [],
-      transactions: recompute(rawTransactions, [], overrides),
+      transactions: recompute(rawTransactions, [], overrides, get().categorySettings),
     });
   },
 

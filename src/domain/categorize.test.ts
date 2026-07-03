@@ -1,6 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { resolveCategory, resolveAll } from "./categorize";
-import type { Transaction, CategoryMapEntry, Override } from "@/types";
+import {
+  resolveCategory,
+  resolveAll,
+  applyClassOverrides,
+} from "./categorize";
+import type {
+  Transaction,
+  CategoryMapEntry,
+  Override,
+  CategoryClass,
+} from "@/types";
 
 const map: CategoryMapEntry[] = [
   { pattern: "k*", category: "Muu", class: "expense" },
@@ -34,6 +43,28 @@ describe("resolveCategory (priority FR-011)", () => {
       class: null,
       isManualOverride: false,
     });
+  });
+});
+
+describe("applyClassOverrides", () => {
+  const txns = [
+    { id: "a", category: "Ginstia", class: "expense", amountCents: 100 },
+    { id: "b", category: "Ruoka", class: "expense", amountCents: -200 },
+    { id: "c", category: null, class: null, amountCents: -300 },
+  ] as Transaction[];
+
+  it("overrides class for matching categories only", () => {
+    const out = applyClassOverrides(
+      txns,
+      new Map<string, CategoryClass>([["Ginstia", "income"]]),
+    );
+    expect(out[0].class).toBe("income");
+    expect(out[1].class).toBe("expense");
+    expect(out[2].class).toBeNull();
+  });
+
+  it("is a no-op without overrides (same array back)", () => {
+    expect(applyClassOverrides(txns, new Map())).toBe(txns);
   });
 });
 

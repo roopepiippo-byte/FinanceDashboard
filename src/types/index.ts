@@ -64,6 +64,8 @@ export interface CategorySetting {
   category: string;
   visible: boolean;
   color: string;
+  /** User-chosen class; overrides the built-in/rule default when set. */
+  class?: CategoryClass;
 }
 
 export interface CustomCategory {

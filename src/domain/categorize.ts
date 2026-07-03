@@ -109,6 +109,23 @@ export function resolveCategory(
   return { category: null, class: null, isManualOverride: false };
 }
 
+/**
+ * Apply category-level class overrides (Asetukset) on top of resolved
+ * transactions: the user can redefine e.g. "Ginstia" as income even though
+ * the built-in default or the rule entries say expense. Applied uniformly,
+ * including manually overridden rows — class is a property of the category.
+ */
+export function applyClassOverrides(
+  txns: Transaction[],
+  classByCategory: Map<string, CategoryClass>,
+): Transaction[] {
+  if (classByCategory.size === 0) return txns;
+  return txns.map((t) => {
+    const cls = t.category ? classByCategory.get(t.category) : undefined;
+    return cls && cls !== t.class ? { ...t, class: cls } : t;
+  });
+}
+
 /** Apply resolution to a list of transactions, returning new objects. */
 export function resolveAll(
   txns: Transaction[],

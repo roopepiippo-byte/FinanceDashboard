@@ -27,6 +27,7 @@ export function Settings() {
   const exportCategoryDb = useStore((s) => s.exportCategoryDb);
   const toggleCategoryVisibility = useStore((s) => s.toggleCategoryVisibility);
   const setCategoryColor = useStore((s) => s.setCategoryColor);
+  const setCategoryClass = useStore((s) => s.setCategoryClass);
   const resetCategoryColors = useStore((s) => s.resetCategoryColors);
   const settings = useStore((s) => s.settings);
   const setQuickSpend = useStore((s) => s.setQuickSpend);
@@ -355,6 +356,8 @@ export function Settings() {
           Rastilla valitset, mitkä luokat ovat mukana Kojelautan kaavioissa ja
           tulot–kulut–säästöaste-laskelmissa. Ilman rastia luokka jätetään
           kokonaan pois laskuista (esim. siirrot omille tileille).
+          Tyyppivalinta (Tulot/Kulut/Siirrot) määrittää, kummalle puolelle
+          laskelmaa luokan summat lasketaan.
         </p>
         <div className="mt-3 flex flex-wrap items-end gap-2 border-b border-border pb-4">
           <input
@@ -424,6 +427,21 @@ export function Settings() {
               >
                 {c.name}
               </span>
+              <select
+                value={c.class}
+                onChange={(e) =>
+                  void setCategoryClass(
+                    c.name,
+                    e.target.value as CategoryClass,
+                  )
+                }
+                title="Luokan tyyppi laskelmissa"
+                className="h-6 shrink-0 rounded border border-border bg-bg px-1 text-[11px] text-muted"
+              >
+                <option value="income">Tulot</option>
+                <option value="expense">Kulut</option>
+                <option value="transfer">Siirrot</option>
+              </select>
             </div>
           ))}
         </div>
