@@ -6,6 +6,10 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm";
 import { CategoryCell } from "@/components/CategoryCell";
+import {
+  ResizableTable,
+  type ColumnDef,
+} from "@/components/ui/ResizableTable";
 import { formatEur } from "@/domain/money";
 import { formatDateFi } from "@/lib/format";
 import { cn } from "@/lib/cn";
@@ -140,32 +144,46 @@ export function Transactions() {
         </Card>
       ) : (
         <Card className="p-0">
-          <div className="max-h-[calc(100vh-15rem)] overflow-y-auto">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 z-10 bg-card">
-                <tr className="border-b border-border text-left text-muted">
-                  <th className="px-4 py-3 font-medium">
+          <ResizableTable
+            id="transactions"
+            containerClassName="max-h-[calc(100vh-15rem)] overflow-auto"
+            headClassName="sticky top-0 z-10 bg-card"
+            columns={
+              [
+                {
+                  id: "date",
+                  width: 110,
+                  min: 90,
+                  header: (
                     <button
                       className="hover:text-text"
                       onClick={() => toggleSort("date")}
                     >
                       Päivä{sortIndicator("date")}
                     </button>
-                  </th>
-                  <th className="px-4 py-3 font-medium">Kauppias</th>
-                  <th className="px-4 py-3 font-medium">Luokka</th>
-                  <th className="px-4 py-3 text-right font-medium">
+                  ),
+                },
+                { id: "merchant", width: 320, min: 120, header: "Kauppias" },
+                { id: "category", width: 210, min: 110, header: "Luokka" },
+                {
+                  id: "amount",
+                  width: 120,
+                  min: 90,
+                  headerClassName: "text-right",
+                  header: (
                     <button
                       className="hover:text-text"
                       onClick={() => toggleSort("amount")}
                     >
                       Summa{sortIndicator("amount")}
                     </button>
-                  </th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody>
+                  ),
+                },
+                { id: "actions", width: 90, min: 70, header: "" },
+              ] satisfies ColumnDef[]
+            }
+          >
+            <tbody>
                 {rows.map((t) => (
                   <tr
                     key={t.id}
@@ -174,7 +192,9 @@ export function Transactions() {
                     <td className="whitespace-nowrap px-4 py-2 tabular-nums text-muted">
                       {formatDateFi(t.date)}
                     </td>
-                    <td className="px-4 py-2 text-text">{t.merchant}</td>
+                    <td className="truncate px-4 py-2 text-text" title={t.merchant}>
+                      {t.merchant}
+                    </td>
                     <td className="px-4 py-2">
                       <CategoryCell transaction={t} />
                     </td>
@@ -198,9 +218,8 @@ export function Transactions() {
                     </td>
                   </tr>
                 ))}
-              </tbody>
-            </table>
-          </div>
+            </tbody>
+          </ResizableTable>
         </Card>
       )}
 

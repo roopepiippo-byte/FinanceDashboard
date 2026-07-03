@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { formatEur } from "@/domain/money";
 import { formatDateFi } from "@/lib/format";
 import { cn } from "@/lib/cn";
+import { ResizableTable } from "@/components/ui/ResizableTable";
 
 export interface AuditQuery {
   title: string;
@@ -69,36 +70,47 @@ export function TransactionsDrawer({
             Ei tapahtumia.
           </p>
         ) : (
-          <div className="max-h-[65vh] overflow-y-auto">
-            <table className="w-full text-sm">
-              <tbody>
-                {rows.map((t) => (
-                  <tr
-                    key={t.id}
-                    className="border-b border-border last:border-0"
+          <ResizableTable
+            id="audit-drawer"
+            containerClassName="max-h-[65vh] overflow-auto"
+            headClassName="sticky top-0 z-10 bg-card"
+            columns={[
+              { id: "date", width: 100, min: 85, header: "Päivä" },
+              { id: "merchant", width: 250, min: 110, header: "Kauppias" },
+              { id: "category", width: 130, min: 90, header: "Luokka" },
+              {
+                id: "amount",
+                width: 110,
+                min: 85,
+                header: "Summa",
+                headerClassName: "text-right",
+              },
+            ]}
+          >
+            <tbody>
+              {rows.map((t) => (
+                <tr key={t.id} className="border-b border-border last:border-0">
+                  <td className="whitespace-nowrap px-4 py-2 tabular-nums text-muted">
+                    {formatDateFi(t.date)}
+                  </td>
+                  <td className="truncate px-4 py-2 text-text" title={t.merchant}>
+                    {t.merchant}
+                  </td>
+                  <td className="truncate px-4 py-2 text-xs text-muted">
+                    {t.category ?? "Luokittelematta"}
+                  </td>
+                  <td
+                    className={cn(
+                      "whitespace-nowrap px-4 py-2 text-right tabular-nums",
+                      t.amountCents < 0 ? "text-red" : "text-green",
+                    )}
                   >
-                    <td className="whitespace-nowrap py-2 pr-4 tabular-nums text-muted">
-                      {formatDateFi(t.date)}
-                    </td>
-                    <td className="max-w-0 truncate py-2 pr-4 text-text">
-                      {t.merchant}
-                    </td>
-                    <td className="whitespace-nowrap py-2 pr-4 text-xs text-muted">
-                      {t.category ?? "Luokittelematta"}
-                    </td>
-                    <td
-                      className={cn(
-                        "whitespace-nowrap py-2 text-right tabular-nums",
-                        t.amountCents < 0 ? "text-red" : "text-green",
-                      )}
-                    >
-                      {formatEur(t.amountCents)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    {formatEur(t.amountCents)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </ResizableTable>
         )}
       </Card>
     </div>

@@ -10,6 +10,7 @@ import {
   TransactionsDrawer,
   type AuditQuery,
 } from "@/components/TransactionsDrawer";
+import { ResizableTable } from "@/components/ui/ResizableTable";
 import { formatEur, sumCents } from "@/domain/money";
 import { cn } from "@/lib/cn";
 
@@ -90,23 +91,28 @@ export function Unmapped() {
           </Card>
         ) : (
           <Card className="p-0">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-muted">
-                  <th className="px-4 py-3 font-medium">Kauppias</th>
-                  <th className="px-4 py-3 font-medium">Kpl</th>
-                  <th className="px-4 py-3 font-medium">Yhteensä</th>
-                  <th className="px-4 py-3 font-medium">Ehdotus</th>
-                  <th className="px-4 py-3 font-medium">Aseta luokka kaikille</th>
-                </tr>
-              </thead>
+            <ResizableTable
+              id="unmapped"
+              columns={[
+                { id: "merchant", width: 280, min: 120, header: "Kauppias" },
+                { id: "count", width: 70, min: 50, header: "Kpl" },
+                { id: "total", width: 110, min: 80, header: "Yhteensä" },
+                { id: "suggestion", width: 150, min: 90, header: "Ehdotus" },
+                {
+                  id: "assign",
+                  width: 220,
+                  min: 140,
+                  header: "Aseta luokka kaikille",
+                },
+              ]}
+            >
               <tbody>
                 {groups.map((g) => (
                   <tr
                     key={g.merchantLower}
                     className="border-b border-border transition-colors last:border-0 hover:bg-card-2"
                   >
-                    <td className="px-4 py-3">
+                    <td className="truncate px-4 py-3">
                       <button
                         className="text-left text-text hover:text-accent hover:underline"
                         title="Näytä tapahtumat"
@@ -170,7 +176,7 @@ export function Unmapped() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </ResizableTable>
           </Card>
         )
       ) : manual.length === 0 ? (
@@ -179,21 +185,23 @@ export function Unmapped() {
         </Card>
       ) : (
         <Card className="p-0">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-muted">
-                <th className="px-4 py-3 font-medium">Kauppias</th>
-                <th className="px-4 py-3 font-medium">Summa</th>
-                <th className="px-4 py-3 font-medium">Luokka</th>
-              </tr>
-            </thead>
+          <ResizableTable
+            id="unmapped-manual"
+            columns={[
+              { id: "merchant", width: 340, min: 120, header: "Kauppias" },
+              { id: "amount", width: 120, min: 80, header: "Summa" },
+              { id: "category", width: 220, min: 120, header: "Luokka" },
+            ]}
+          >
             <tbody>
               {manual.map((t) => (
                 <tr
                   key={t.id}
                   className="border-b border-border transition-colors last:border-0 hover:bg-card-2"
                 >
-                  <td className="px-4 py-3 text-text">{t.merchant}</td>
+                  <td className="truncate px-4 py-3 text-text" title={t.merchant}>
+                    {t.merchant}
+                  </td>
                   <td
                     className={cn(
                       "px-4 py-3 tabular-nums",
@@ -208,7 +216,7 @@ export function Unmapped() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </ResizableTable>
           <div className="px-4 py-2 text-xs text-muted">
             Yhteensä{" "}
             <span className="tabular-nums">

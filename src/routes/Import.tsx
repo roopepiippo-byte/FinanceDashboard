@@ -4,6 +4,7 @@ import { useToast } from "@/components/ui/toast";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm";
+import { ResizableTable } from "@/components/ui/ResizableTable";
 import { cn } from "@/lib/cn";
 import { formatDateFi } from "@/lib/format";
 
@@ -86,19 +87,21 @@ export function Import() {
         <Card className="text-sm text-muted">Ei tuotuja tiedostoja vielä.</Card>
       ) : (
         <Card className="p-0">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-muted">
-                <th className="px-4 py-3 font-medium">Tiedosto</th>
-                <th className="px-4 py-3 font-medium">Tuotu</th>
-                <th className="px-4 py-3 font-medium">Tapahtumia</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
+          <ResizableTable
+            id="imported-files"
+            columns={[
+              { id: "file", width: 380, min: 140, header: "Tiedosto" },
+              { id: "date", width: 120, min: 90, header: "Tuotu" },
+              { id: "count", width: 110, min: 80, header: "Tapahtumia" },
+              { id: "actions", width: 90, min: 70, header: "" },
+            ]}
+          >
             <tbody>
               {importedFiles.map((f) => (
                 <tr key={f.id} className="border-b border-border last:border-0">
-                  <td className="px-4 py-3 text-text">{f.filename}</td>
+                  <td className="truncate px-4 py-3 text-text" title={f.filename}>
+                    {f.filename}
+                  </td>
                   <td className="px-4 py-3 text-muted">
                     {formatDateFi(f.importedAt.slice(0, 10))}
                   </td>
@@ -115,7 +118,7 @@ export function Import() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </ResizableTable>
         </Card>
       )}
 
