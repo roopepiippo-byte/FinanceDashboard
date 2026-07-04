@@ -6,6 +6,9 @@ import {
   yearComparison,
   categorySeries,
   topCategories,
+  detectAnomalies,
+  cumulativeNetByYear,
+  dividendBreakdown,
 } from "./insights";
 import type { Transaction } from "@/types";
 
@@ -126,6 +129,89 @@ describe("yearComparison", () => {
 
   it("returns null without previous-year data", () => {
     expect(yearComparison([tx({})], visible)).toBeNull();
+  });
+});
+
+describe("detectAnomalies", () => {
+  it("flags a month far above the category's own average", () => {
+    // Ruoka steady 200/mo for 5 months, then a 900 month.
+    const txns = [
+      ...["01", "02", "03", "04", "05"].map((m) =>
+        tx({ date: `2025-${m}-10`, amountCents: -20000 }),
+      ),
+      tx({ date: "2025-06-10", amountCents: -90000 }),
+    ];
+    const anomalies = detectAnomalies(txns, visible);
+    expect(anomalies).toHaveLength(1);
+    expect(anomalies[0]).toMatchObject({ category: "Ruoka", month: "2025-06" });
+    expect(anomalies[0].avgCents).toBe(20000);
+    expect(anomalies[0].excessCents).toBe(70000);
+  });
+
+  it("ignores small excesses and short histories", () => {
+    const small = [
+      ...["01", "02", "03", "04", "05"].map((m) =>
+        tx({ date: `2025-${m}-10`, amountCents: -2000 }),
+      ),
+      tx({ date: "2025-06-10", amountCents: -5000 }), // 2.5x but only 30 EUR over
+    ];
+    expect(detectAnomalies(small, visible)).toHaveLength(0);
+    const short = [
+      tx({ date: "2025-01-10", amountCents: -1000 }),
+      tx({ date: "2025-02-10", amountCents: -90000 }),
+    ];
+    expect(detectAnomalies(short, visible)).toHaveLength(0);
+  });
+});
+
+describe("cumulativeNetByYear", () => {
+  it("accumulates signed net and nulls months after the latest data", () => {
+    const txns = [
+      tx({ date: "2026-01-05", amountCents: 300000, category: "Palkka", class: "income" }),
+      tx({ date: "2026-01-20", amountCents: -100000 }),
+      tx({ date: "2026-02-20", amountCents: -50000 }),
+    ];
+    const c = cumulativeNetByYear(txns, visible, 2026);
+    expect(c[0]).toBe(200000);
+    expect(c[1]).toBe(150000);
+    expect(c[2]).toBeNull(); // after latest data month
+    expect(c[11]).toBeNull();
+  });
+
+  it("fills a fully past year through December", () => {
+    const txns = [
+      tx({ date: "2025-03-10", amountCents: -10000 }),
+      tx({ date: "2026-01-05", amountCents: -1000 }), // makes 2026-01 the latest
+    ];
+    const c = cumulativeNetByYear(txns, visible, 2025);
+    expect(c[2]).toBe(-10000);
+    expect(c[11]).toBe(-10000); // carried through year end, no nulls
+  });
+});
+
+describe("dividendBreakdown", () => {
+  it("sums per year and per payer, negatives included as-is", () => {
+    const txns = [
+      tx({ date: "2025-02-01", amountCents: 84, merchant: "NOKIA OYJ", merchantLower: "nokia oyj", category: "Osinko", class: "income" }),
+      tx({ date: "2025-08-01", amountCents: 112, merchant: "NOKIA OYJ", merchantLower: "nokia oyj", category: "Osinko", class: "income" }),
+      tx({ date: "2026-03-01", amountCents: 210, merchant: "FISKARS", merchantLower: "fiskars", category: "Osinko", class: "income" }),
+      tx({ date: "2026-04-01", amountCents: -100, merchant: "FISKARS", merchantLower: "fiskars", category: "Osinko", class: "income" }),
+    ];
+    const d = dividendBreakdown(txns)!;
+    expect(d.year).toBe(2026);
+    expect(d.yearTotals).toEqual([
+      { year: 2025, cents: 196 },
+      { year: 2026, cents: 110 },
+    ]);
+    const fiskars = d.payers.find((p) => p.merchantLower === "fiskars")!;
+    expect(fiskars.currentCents).toBe(110);
+    expect(fiskars.prevCents).toBe(0);
+    const nokia = d.payers.find((p) => p.merchantLower === "nokia oyj")!;
+    expect(nokia.totalCents).toBe(196);
+  });
+
+  it("returns null when the category has no rows", () => {
+    expect(dividendBreakdown([tx({})])).toBeNull();
   });
 });
 

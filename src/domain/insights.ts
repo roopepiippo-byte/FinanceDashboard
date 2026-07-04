@@ -260,6 +260,151 @@ export function categorySeries(
   return months.map((m) => byMonth.get(m) ?? 0);
 }
 
+export interface Anomaly {
+  category: string;
+  month: string;
+  cents: number;
+  /** Average of the OTHER months in the window. */
+  avgCents: number;
+  excessCents: number;
+}
+
+/**
+ * Flag category-months that clearly break the category's own pattern:
+ * spend >= `factor` x the average of the other window months AND the excess
+ * is at least `minExcessCents` (ignores small-euro noise).
+ */
+export function detectAnomalies(
+  txns: Transaction[],
+  visible: Set<string>,
+  window = 12,
+  factor = 2,
+  minExcessCents = 10000,
+): Anomaly[] {
+  const months = dataMonths(txns, visible).slice(-window);
+  if (months.length < 4) return []; // too little history to call anything odd
+
+  const perMonth = months.map((m) => monthSpend(txns, visible, m));
+  const cats = new Set<string>();
+  for (const m of perMonth) for (const c of m.keys()) cats.add(c);
+
+  const out: Anomaly[] = [];
+  for (const category of cats) {
+    const series = perMonth.map((m) => m.get(category) ?? 0);
+    const total = series.reduce((a, b) => a + b, 0);
+    series.forEach((cents, i) => {
+      if (cents <= 0) return;
+      const avgOthers = divideCents(total - cents, months.length - 1);
+      if (cents >= factor * avgOthers && cents - avgOthers >= minExcessCents) {
+        out.push({
+          category,
+          month: months[i],
+          cents,
+          avgCents: avgOthers,
+          excessCents: cents - avgOthers,
+        });
+      }
+    });
+  }
+  return out.sort((a, b) => b.excessCents - a.excessCents);
+}
+
+/**
+ * Cumulative included net (income - expense) per calendar month of `year`.
+ * Index 0 = January. Months after the latest data month are null (so the
+ * current year's line stops where the data stops).
+ */
+export function cumulativeNetByYear(
+  txns: Transaction[],
+  visible: Set<string>,
+  year: number,
+): (number | null)[] {
+  const months = dataMonths(txns, visible);
+  const latest = months[months.length - 1] ?? "";
+  const perMonth = Array(12).fill(0) as number[];
+  for (const t of txns) {
+    if (!isIncluded(t, visible)) continue;
+    if (Number(t.date.slice(0, 4)) !== year) continue;
+    const m = Number(t.date.slice(5, 7)) - 1;
+    // Net is the signed sum: income adds, expense subtracts, refunds and
+    // negative income rows land correctly by sign.
+    perMonth[m] += t.amountCents;
+  }
+  const out: (number | null)[] = [];
+  let cum = 0;
+  for (let m = 0; m < 12; m++) {
+    const key = `${year}-${String(m + 1).padStart(2, "0")}`;
+    if (latest && key > latest) {
+      out.push(null);
+      continue;
+    }
+    cum += perMonth[m];
+    out.push(cum);
+  }
+  return out;
+}
+
+export interface PayerRow {
+  merchant: string;
+  merchantLower: string;
+  currentCents: number;
+  prevCents: number;
+  totalCents: number;
+  count: number;
+}
+
+export interface DividendBreakdown {
+  year: number;
+  prevYear: number;
+  yearTotals: { year: number; cents: number }[];
+  payers: PayerRow[];
+}
+
+/** Per-payer breakdown of a (dividend) category, all signs summed as-is. */
+export function dividendBreakdown(
+  txns: Transaction[],
+  category = "Osinko",
+): DividendBreakdown | null {
+  const rows = txns.filter((t) => t.category === category);
+  if (rows.length === 0) return null;
+
+  const years = [...new Set(rows.map((t) => Number(t.date.slice(0, 4))))].sort();
+  const year = years[years.length - 1];
+  const prevYear = year - 1;
+
+  const yearTotals = years.map((y) => ({
+    year: y,
+    cents: rows
+      .filter((t) => Number(t.date.slice(0, 4)) === y)
+      .reduce((a, t) => a + t.amountCents, 0),
+  }));
+
+  const byPayer = new Map<string, PayerRow>();
+  for (const t of rows) {
+    const cur = byPayer.get(t.merchantLower) ?? {
+      merchant: t.merchant,
+      merchantLower: t.merchantLower,
+      currentCents: 0,
+      prevCents: 0,
+      totalCents: 0,
+      count: 0,
+    };
+    const y = Number(t.date.slice(0, 4));
+    if (y === year) cur.currentCents += t.amountCents;
+    if (y === prevYear) cur.prevCents += t.amountCents;
+    cur.totalCents += t.amountCents;
+    cur.count += 1;
+    byPayer.set(t.merchantLower, cur);
+  }
+
+  return {
+    year,
+    prevYear,
+    yearTotals,
+    payers: [...byPayer.values()].sort((a, b) => b.totalCents - a.totalCents),
+  };
+}
+
 /** Top-N expense categories over the given months (by total spend). */
 export function topCategories(
   txns: Transaction[],

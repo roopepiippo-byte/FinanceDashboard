@@ -8,18 +8,53 @@ import {
 } from "@/components/TransactionsDrawer";
 import { ResizableTable } from "@/components/ui/ResizableTable";
 import {
+  Line,
+  LineChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
   dataMonths,
   monthMovers,
   detectRecurring,
   yearComparison,
   categorySeries,
   topCategories,
+  detectAnomalies,
+  cumulativeNetByYear,
+  dividendBreakdown,
 } from "@/domain/insights";
+import {
+  CHART_COLORS,
+  TOOLTIP_STYLE,
+  TOOLTIP_LABEL_STYLE,
+  AXIS_PROPS,
+  eurAxisTick,
+} from "@/components/charts/chartUtils";
 import { monthlyFlows, flowDirection } from "@/domain/totals";
 import { snapshotTotals } from "@/domain/wealth";
 import { formatEur, sumCents } from "@/domain/money";
 import { formatMonthFi, formatNumberFi, monthOf, formatDateFi } from "@/lib/format";
 import { cn } from "@/lib/cn";
+
+const KK = [
+  "tammi",
+  "helmi",
+  "maalis",
+  "huhti",
+  "touko",
+  "kesä",
+  "heinä",
+  "elo",
+  "syys",
+  "loka",
+  "marras",
+  "joulu",
+];
 
 export function Insights() {
   const transactions = useStore((s) => s.transactions);
@@ -62,6 +97,37 @@ export function Insights() {
     [transactions, visible],
   );
 
+  const anomalies = useMemo(
+    () => detectAnomalies(transactions, visible).slice(0, 10),
+    [transactions, visible],
+  );
+
+  const netRace = useMemo(() => {
+    if (months.length === 0) return null;
+    const year = Number(months[months.length - 1].slice(0, 4));
+    const prevYear = year - 1;
+    const hasPrev = months.some((m) => m.startsWith(String(prevYear)));
+    const cur = cumulativeNetByYear(transactions, visible, year);
+    const prev = hasPrev
+      ? cumulativeNetByYear(transactions, visible, prevYear)
+      : null;
+    return {
+      year,
+      prevYear,
+      hasPrev,
+      data: Array.from({ length: 12 }, (_, i) => ({
+        m: i + 1,
+        cur: cur[i],
+        prev: prev ? prev[i] : null,
+      })),
+    };
+  }, [transactions, visible, months]);
+
+  const dividends = useMemo(
+    () => dividendBreakdown(transactions),
+    [transactions],
+  );
+
   const trendMonths = useMemo(() => months.slice(-12), [months]);
   const trendCats = useMemo(
     () => topCategories(transactions, visible, trendMonths, 8),
@@ -101,6 +167,13 @@ export function Insights() {
       txns: transactions.filter(
         (t) =>
           t.merchantLower === merchantLower && flowDirection(t) === "expense",
+      ),
+    });
+  const openPayer = (merchantLower: string, merchant: string) =>
+    setAudit({
+      title: `${merchant} — Osinko`,
+      txns: transactions.filter(
+        (t) => t.merchantLower === merchantLower && t.category === "Osinko",
       ),
     });
   const openCategoryYtd = (category: string) => {
@@ -204,6 +277,111 @@ export function Insights() {
           />
         </div>
       </Card>
+
+      {/* Cumulative net race */}
+      {netRace && (
+        <Card className="mt-4">
+          <CardTitle>
+            Kertyvä netto — {netRace.year}
+            {netRace.hasPrev ? ` vs. ${netRace.prevYear}` : ""}
+          </CardTitle>
+          <div className="mt-3">
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart
+                data={netRace.data}
+                margin={{ top: 8, right: 8, bottom: 0, left: 8 }}
+              >
+                <CartesianGrid stroke={CHART_COLORS.grid} vertical={false} />
+                <XAxis
+                  dataKey="m"
+                  tickFormatter={(m) => KK[Number(m) - 1] ?? String(m)}
+                  {...AXIS_PROPS}
+                />
+                <YAxis tickFormatter={eurAxisTick} width={64} {...AXIS_PROPS} />
+                <Tooltip
+                  contentStyle={TOOLTIP_STYLE}
+                  labelStyle={TOOLTIP_LABEL_STYLE}
+                  labelFormatter={(m) => KK[Number(m) - 1] ?? String(m)}
+                  formatter={(v, name) => [formatEur(Number(v)), String(name)]}
+                />
+                <Legend
+                  formatter={(value: string) => (
+                    <span style={{ color: CHART_COLORS.muted, fontSize: 12 }}>
+                      {value}
+                    </span>
+                  )}
+                />
+                {netRace.hasPrev && (
+                  <Line
+                    type="monotone"
+                    dataKey="prev"
+                    name={String(netRace.prevYear)}
+                    stroke={CHART_COLORS.muted}
+                    strokeWidth={1.5}
+                    dot={false}
+                  />
+                )}
+                <Line
+                  type="monotone"
+                  dataKey="cur"
+                  name={String(netRace.year)}
+                  stroke={CHART_COLORS.accent}
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{
+                    r: 4,
+                    stroke: CHART_COLORS.surface,
+                    strokeWidth: 2,
+                  }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      )}
+
+      {/* Anomalies */}
+      {anomalies.length > 0 && (
+        <Card className="mt-4">
+          <CardTitle>Poikkeamat</CardTitle>
+          <p className="mt-1 text-xs text-muted">
+            Kuukaudet, joissa luokan kulut olivat vähintään kaksinkertaiset
+            luokan omaan keskiarvoon nähden (viimeiset 12 kk).
+          </p>
+          <ul className="mt-3 space-y-1">
+            {anomalies.map((a) => (
+              <li key={`${a.category}|${a.month}`}>
+                <button
+                  onClick={() => openCategoryMonth(a.category, a.month)}
+                  title="Näytä tapahtumat"
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-bg"
+                >
+                  <span className="w-16 shrink-0 tabular-nums text-muted">
+                    {formatMonthFi(a.month)}
+                  </span>
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{ background: colorOf(a.category) }}
+                  />
+                  <span className="min-w-0 flex-1 truncate text-text">
+                    {a.category}
+                  </span>
+                  <span className="tabular-nums text-text">
+                    {formatEur(a.cents)}
+                  </span>
+                  <span className="w-32 whitespace-nowrap text-right text-xs tabular-nums text-muted">
+                    ka {formatEur(a.avgCents)} (
+                    {formatNumberFi(
+                      a.avgCents > 0 ? a.cents / a.avgCents : 0,
+                    )}
+                    ×)
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       {/* Recurring charges */}
       <Card className="mt-4 p-0">
@@ -327,6 +505,55 @@ export function Insights() {
                   >
                     {r.deltaCents >= 0 ? "+" : ""}
                     {formatEur(r.deltaCents)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      )}
+
+      {/* Dividends */}
+      {dividends && (
+        <Card className="mt-4">
+          <CardTitle>Osingot</CardTitle>
+          <p className="mt-1 text-xs tabular-nums text-muted">
+            {dividends.yearTotals
+              .map((y) => `${y.year}: ${formatEur(y.cents)}`)
+              .join(" · ")}
+          </p>
+          <table className="mt-3 w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-muted">
+                <th className="py-2 pr-4 font-medium">Maksaja</th>
+                <th className="py-2 pr-4 text-right font-medium">
+                  {dividends.prevYear}
+                </th>
+                <th className="py-2 pr-4 text-right font-medium">
+                  {dividends.year}
+                </th>
+                <th className="py-2 text-right font-medium">Yhteensä</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dividends.payers.map((p) => (
+                <tr
+                  key={p.merchantLower}
+                  className="cursor-pointer border-b border-border transition-colors last:border-0 hover:bg-card-2"
+                  onClick={() => openPayer(p.merchantLower, p.merchant)}
+                  title="Näytä tapahtumat"
+                >
+                  <td className="max-w-0 truncate py-2 pr-4 text-text">
+                    {p.merchant}
+                  </td>
+                  <td className="py-2 pr-4 text-right tabular-nums text-muted">
+                    {p.prevCents !== 0 ? formatEur(p.prevCents) : "—"}
+                  </td>
+                  <td className="py-2 pr-4 text-right tabular-nums text-text">
+                    {p.currentCents !== 0 ? formatEur(p.currentCents) : "—"}
+                  </td>
+                  <td className="py-2 text-right tabular-nums text-green">
+                    {formatEur(p.totalCents)}
                   </td>
                 </tr>
               ))}
