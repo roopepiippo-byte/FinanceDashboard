@@ -44,10 +44,20 @@ export function Budget() {
   );
 
   const [audit, setAudit] = useState<AuditQuery | null>(null);
-  const thisMonth = new Date().toISOString().slice(0, 7);
+
+  // Months that actually have transactions; the meters default to the
+  // LATEST one (the calendar month is often still empty of data).
+  const months = useMemo(
+    () => [...new Set(transactions.map((t) => monthOf(t.date)))].sort(),
+    [transactions],
+  );
+  const [pickedMonth, setPickedMonth] = useState<string | null>(null);
+  const meterMonth =
+    pickedMonth ?? months[months.length - 1] ?? new Date().toISOString().slice(0, 7);
+  const monthIdx = months.indexOf(meterMonth);
 
   const monthMeters = useMemo(() => {
-    const spend = monthSpendByCategory(transactions, visible, thisMonth);
+    const spend = monthSpendByCategory(transactions, visible, meterMonth);
     return Object.entries(budget.categories)
       .filter(([, t]) => t.targetCents > 0)
       .map(([category, target]) => ({
@@ -57,16 +67,16 @@ export function Budget() {
         ratio: (spend.get(category) ?? 0) / target.targetCents,
       }))
       .sort((a, b) => b.ratio - a.ratio);
-  }, [transactions, visible, budget.categories, thisMonth]);
+  }, [transactions, visible, budget.categories, meterMonth]);
 
   function openMeter(category: string) {
     setAudit({
-      title: `${category} — ${formatMonthFi(thisMonth)}`,
+      title: `${category} — ${formatMonthFi(meterMonth)}`,
       txns: transactions.filter(
         (t) =>
           t.category === category &&
           visible.has(t.category) &&
-          monthOf(t.date) === thisMonth &&
+          monthOf(t.date) === meterMonth &&
           flowDirection(t) === "expense",
       ),
     });
@@ -141,10 +151,34 @@ export function Budget() {
 
   return (
     <div>
-      {/* This month vs targets */}
+      {/* Month vs targets */}
       {monthMeters.length > 0 && (
         <Card className="mb-4">
-          <CardTitle>Tämä kuukausi vs. tavoite</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>
+              Kuukausi vs. tavoite — {formatMonthFi(meterMonth)}
+            </CardTitle>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={monthIdx <= 0}
+                onClick={() => setPickedMonth(months[monthIdx - 1])}
+                title="Edellinen kuukausi"
+              >
+                ‹
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={monthIdx < 0 || monthIdx >= months.length - 1}
+                onClick={() => setPickedMonth(months[monthIdx + 1])}
+                title="Seuraava kuukausi"
+              >
+                ›
+              </Button>
+            </div>
+          </div>
           <div className="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 lg:grid-cols-2">
             {monthMeters.map((m) => {
               const pct = Math.min(m.ratio * 100, 100);
