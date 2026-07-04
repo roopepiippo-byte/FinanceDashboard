@@ -6,6 +6,7 @@ import { DateRangePicker } from "./DateRangePicker";
 
 const PAGE_TITLES: Record<string, string> = {
   "/": "Kojelauta",
+  "/insights": "Analyysi",
   "/transactions": "Tapahtumat",
   "/budget": "Budjetti",
   "/wealth": "Varallisuus",

@@ -2,6 +2,7 @@ import { createHashRouter, RouterProvider } from "react-router-dom";
 import { ToastProvider } from "@/components/ui/toast";
 import { Layout } from "@/components/layout/Layout";
 import { Dashboard } from "@/routes/Dashboard";
+import { Insights } from "@/routes/Insights";
 import { Import } from "@/routes/Import";
 import { Unmapped } from "@/routes/Unmapped";
 import { Transactions } from "@/routes/Transactions";
@@ -14,6 +15,7 @@ const router = createHashRouter([
     element: <Layout />,
     children: [
       { path: "/", element: <Dashboard /> },
+      { path: "/insights", element: <Insights /> },
       { path: "/transactions", element: <Transactions /> },
       { path: "/budget", element: <Budget /> },
       { path: "/wealth", element: <Wealth /> },

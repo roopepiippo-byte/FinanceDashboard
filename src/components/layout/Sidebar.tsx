@@ -39,6 +39,12 @@ const NAV: NavItem[] = [
     icon: <Icon d="M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z" />,
   },
   {
+    to: "/insights",
+    label: "Analyysi",
+    needsData: true,
+    icon: <Icon d="M21 21l-4.35-4.35M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16zM8 12l2-2 2 2 3-4" />,
+  },
+  {
     to: "/transactions",
     label: "Tapahtumat",
     needsData: true,
