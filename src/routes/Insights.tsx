@@ -64,6 +64,7 @@ export function Insights() {
 
   const [audit, setAudit] = useState<AuditQuery | null>(null);
   const [pickedMonth, setPickedMonth] = useState<string | null>(null);
+  const [showRecurring, setShowRecurring] = useState(false);
 
   const visible = useMemo(
     () =>
@@ -208,7 +209,11 @@ export function Insights() {
     <div>
       {/* Stat tiles */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Card className="py-4">
+        <Card
+          className="cursor-pointer py-4 transition-colors hover:border-accent/50"
+          onClick={() => setShowRecurring(true)}
+          title="Näytä erittely"
+        >
           <CardTitle>Toistuvat maksut</CardTitle>
           <CardValue>{formatEur(recurringTotal)}/kk</CardValue>
           <p className="mt-0.5 text-xs text-muted">
@@ -582,6 +587,71 @@ export function Insights() {
           ))}
         </div>
       </Card>
+
+      {showRecurring && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4"
+          onClick={() => setShowRecurring(false)}
+        >
+          <Card
+            className="my-8 w-full max-w-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <CardTitle>Toistuvat maksut</CardTitle>
+                <p className="mt-0.5 text-xs text-muted">
+                  <span className="tabular-nums">{recurring.length}</span>{" "}
+                  sitoumusta · yhteensä{" "}
+                  <span className="font-medium tabular-nums text-red">
+                    {formatEur(recurringTotal)}/kk
+                  </span>
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowRecurring(false)}
+              >
+                Sulje
+              </Button>
+            </div>
+            <div className="max-h-[65vh] overflow-y-auto">
+              <ul>
+                {recurring.map((r) => (
+                  <li key={r.merchantLower}>
+                    <button
+                      onClick={() => {
+                        setShowRecurring(false);
+                        openMerchant(r.merchantLower, r.merchant);
+                      }}
+                      title="Näytä tapahtumat"
+                      className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left text-sm transition-colors hover:bg-bg"
+                    >
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ background: colorOf(r.category) }}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-text">
+                          {r.merchant}
+                        </span>
+                        <span className="block text-xs text-muted">
+                          {r.category} · {r.occurrences} kpl · viimeksi{" "}
+                          {formatDateFi(r.lastDate)}
+                        </span>
+                      </span>
+                      <span className="whitespace-nowrap tabular-nums text-text">
+                        {formatEur(r.monthlyCents)}/kk
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {audit && (
         <TransactionsDrawer query={audit} onClose={() => setAudit(null)} />
