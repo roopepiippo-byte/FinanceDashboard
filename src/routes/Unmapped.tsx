@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { useStore } from "@/store";
 import { useToast } from "@/components/ui/toast";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm";
 import { CategorySelect } from "@/components/CategorySelect";
 import { CategoryCell } from "@/components/CategoryCell";
 import { categoryClassOf } from "@/store/selectors";
@@ -28,9 +30,11 @@ export function Unmapped() {
   const transactions = useStore((s) => s.transactions);
   const categoryMap = useStore((s) => s.categoryMap);
   const applyMerchantCategory = useStore((s) => s.applyMerchantCategory);
+  const applyMerchantCategories = useStore((s) => s.applyMerchantCategories);
   const toast = useToast();
   const [tab, setTab] = useState<Tab>("unmapped");
   const [audit, setAudit] = useState<AuditQuery | null>(null);
+  const [confirmAll, setConfirmAll] = useState(false);
 
   const groups = useMemo<MerchantGroup[]>(() => {
     const map = new Map<string, Omit<MerchantGroup, "suggestion">>();
@@ -73,15 +77,38 @@ export function Unmapped() {
     toast.success(`${g.merchant} → ${category} (${g.count} tapahtumaa)`);
   }
 
+  const suggested = groups.filter((g) => g.suggestion !== null);
+
+  async function applyAllSuggestions() {
+    const items = suggested.map((g) => ({
+      pattern: g.merchantLower,
+      category: g.suggestion!.category,
+      cls: categoryClassOf(g.suggestion!.category),
+      display: g.merchant,
+    }));
+    await applyMerchantCategories(items);
+    toast.success(`Luokiteltu ${items.length} kauppiasta ehdotusten mukaan`);
+  }
+
   return (
     <div>
-      <div className="mb-4 flex gap-2">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <TabButton active={tab === "unmapped"} onClick={() => setTab("unmapped")}>
           Luokittelematta ({groups.length})
         </TabButton>
         <TabButton active={tab === "manual"} onClick={() => setTab("manual")}>
           Manuaalisesti asetettu ({manual.length})
         </TabButton>
+        {tab === "unmapped" && suggested.length > 0 && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="ml-auto"
+            onClick={() => setConfirmAll(true)}
+          >
+            Hyväksy kaikki ehdotukset ({suggested.length})
+          </Button>
+        )}
       </div>
 
       {tab === "unmapped" ? (
@@ -225,6 +252,18 @@ export function Unmapped() {
           </div>
         </Card>
       )}
+
+      <ConfirmDialog
+        open={confirmAll}
+        title="Hyväksy kaikki ehdotukset"
+        message={`${suggested.length} kauppiasta luokitellaan ehdotusten mukaan ja säännöt tallennetaan tietokantaan. Voit korjata yksittäisiä luokkia jälkikäteen Tapahtumat-sivulla tai muuttamalla sääntöä.`}
+        confirmLabel="Hyväksy"
+        onCancel={() => setConfirmAll(false)}
+        onConfirm={async () => {
+          setConfirmAll(false);
+          await applyAllSuggestions();
+        }}
+      />
 
       {audit && (
         <TransactionsDrawer query={audit} onClose={() => setAudit(null)} />

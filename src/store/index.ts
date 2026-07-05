@@ -97,6 +97,15 @@ interface AppState {
     cls: CategoryClass,
     display?: string,
   ) => Promise<void>;
+  /** Mass-apply (e.g. "accept all suggestions"): one write, one recompute. */
+  applyMerchantCategories: (
+    items: {
+      pattern: string;
+      category: string;
+      cls: CategoryClass;
+      display?: string;
+    }[],
+  ) => Promise<void>;
   setOverride: (
     transactionId: string,
     category: string,
@@ -287,6 +296,33 @@ export const useStore = create<AppState>((set, get) => ({
     set({
       categoryMap,
       transactions: recompute(rawTransactions, categoryMap, overrides, get().categorySettings),
+    });
+  },
+
+  async applyMerchantCategories(items) {
+    if (items.length === 0) return;
+    const entries: CategoryMapEntry[] = items.map((i) => ({
+      pattern: i.pattern,
+      category: i.category,
+      class: i.cls,
+      display: i.display ?? i.pattern,
+      group: groupFromClass(i.cls),
+    }));
+    await categoryMapRepo.bulkUpsert(entries);
+    const patterns = new Set(entries.map((e) => e.pattern));
+    const categoryMap = [
+      ...get().categoryMap.filter((e) => !patterns.has(e.pattern)),
+      ...entries,
+    ];
+    const { rawTransactions, overrides } = get();
+    set({
+      categoryMap,
+      transactions: recompute(
+        rawTransactions,
+        categoryMap,
+        overrides,
+        get().categorySettings,
+      ),
     });
   },
 
