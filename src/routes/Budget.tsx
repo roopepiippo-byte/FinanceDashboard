@@ -243,7 +243,8 @@ export function Budget() {
         <Card className="lg:col-span-1">
           <CardTitle>Säästötavoite</CardTitle>
           <p className="mt-1 text-xs text-muted">
-            Osuus kuukausituloista ({formatEur(avgIncome)}/kk)
+            Osuus keskimääräisistä kuukausituloista {formatEur(avgIncome)}/kk
+            (viimeiset 12 kk, joilta on tapahtumia)
           </p>
           <div className="mt-4 flex items-center gap-3">
             <input
