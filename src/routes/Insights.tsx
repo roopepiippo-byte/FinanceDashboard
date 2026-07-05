@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useStore } from "@/store";
 import { Card, CardTitle, CardValue } from "@/components/ui/card";
+import { CollapsibleCard } from "@/components/ui/CollapsibleCard";
 import { Button } from "@/components/ui/button";
 import {
   TransactionsDrawer,
@@ -346,9 +347,12 @@ export function Insights() {
 
       {/* Anomalies */}
       {anomalies.length > 0 && (
-        <Card className="mt-4">
-          <CardTitle>Poikkeamat</CardTitle>
-          <p className="mt-1 text-xs text-muted">
+        <CollapsibleCard
+          id="insights-anomalies"
+          title="Poikkeamat"
+          badge={`${anomalies.length} kpl`}
+        >
+          <p className="text-xs text-muted">
             Kuukaudet, joissa luokan kulut olivat vähintään kaksinkertaiset
             luokan omaan keskiarvoon nähden (viimeiset 12 kk).
           </p>
@@ -384,17 +388,26 @@ export function Insights() {
               </li>
             ))}
           </ul>
-        </Card>
+        </CollapsibleCard>
       )}
 
       {/* Year over year */}
       {yoy && (
-        <Card className="mt-4">
-          <CardTitle>
-            Vuosivertailu — 01–{String(yoy.throughMonth).padStart(2, "0")}/
-            {yoy.year} vs. sama jakso {yoy.prevYear}
-          </CardTitle>
-          <p className="mt-1 text-xs text-muted">
+        <CollapsibleCard
+          id="insights-yoy"
+          title={`Vuosivertailu — 01–${String(yoy.throughMonth).padStart(2, "0")}/${yoy.year} vs. sama jakso ${yoy.prevYear}`}
+          badge={
+            <span
+              className={cn(
+                yoy.currentTotal <= yoy.prevTotal ? "text-green" : "text-red",
+              )}
+            >
+              {yoy.currentTotal - yoy.prevTotal >= 0 ? "+" : ""}
+              {formatEur(yoy.currentTotal - yoy.prevTotal)}
+            </span>
+          }
+        >
+          <p className="text-xs text-muted">
             Kulut yhteensä{" "}
             <span className="tabular-nums text-text">
               {formatEur(yoy.currentTotal)}
@@ -457,14 +470,17 @@ export function Insights() {
               ))}
             </tbody>
           </table>
-        </Card>
+        </CollapsibleCard>
       )}
 
       {/* Dividends */}
       {dividends && (
-        <Card className="mt-4">
-          <CardTitle>Osingot</CardTitle>
-          <p className="mt-1 text-xs text-muted">
+        <CollapsibleCard
+          id="insights-dividends"
+          title="Osingot"
+          badge={<span className="text-green">{formatEur(dividends.totalCents)}</span>}
+        >
+          <p className="text-xs text-muted">
             Kaikki vuodet, joilta osinkoja on datassa — vuosisarakkeet
             summautuvat Yhteensä-sarakkeeseen.
           </p>
@@ -524,13 +540,16 @@ export function Insights() {
               </tfoot>
             </table>
           </div>
-        </Card>
+        </CollapsibleCard>
       )}
 
       {/* Category trends */}
-      <Card className="mt-4">
-        <CardTitle>Luokkatrendit — viimeiset {trendMonths.length} kk</CardTitle>
-        <p className="mt-1 text-xs text-muted">
+      <CollapsibleCard
+        id="insights-trends"
+        title={`Luokkatrendit — viimeiset ${trendMonths.length} kk`}
+        badge={`${trendCats.length} luokkaa`}
+      >
+        <p className="text-xs text-muted">
           Viiva on jakson keskiarvo. Klikkaa pylvästä nähdäksesi kuukauden
           tapahtumat.
         </p>
@@ -546,7 +565,7 @@ export function Insights() {
             />
           ))}
         </div>
-      </Card>
+      </CollapsibleCard>
 
       {showRecurring && (
         <div

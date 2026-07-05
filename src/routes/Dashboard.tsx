@@ -22,6 +22,7 @@ import {
   TransactionsDrawer,
   type AuditQuery,
 } from "@/components/TransactionsDrawer";
+import { ResizableTable } from "@/components/ui/ResizableTable";
 import { cn } from "@/lib/cn";
 
 interface Delta {
@@ -280,33 +281,58 @@ export function Dashboard() {
           </Card>
         )}
         {view.merchants.length > 0 && (
-          <Card>
+          <Card className="pb-2">
             <CardTitle>Suurimmat kauppiaat</CardTitle>
-            <table className="mt-3 w-full text-sm">
-              <tbody>
-                {view.merchants.map((m, i) => (
-                  <tr
-                    key={m.merchantLower}
-                    className="cursor-pointer border-b border-border transition-colors last:border-0 hover:bg-card-2"
-                    onClick={() => openMerchant(m.merchantLower, m.merchant)}
-                    title="Näytä tapahtumat"
-                  >
-                    <td className="w-6 py-1.5 pr-2 text-xs tabular-nums text-muted/60">
-                      {i + 1}
-                    </td>
-                    <td className="max-w-0 truncate py-1.5 pr-4 text-text">
-                      {m.merchant}
-                    </td>
-                    <td className="whitespace-nowrap py-1.5 pr-4 text-right text-xs tabular-nums text-muted">
-                      {m.count} kpl
-                    </td>
-                    <td className="whitespace-nowrap py-1.5 text-right tabular-nums text-text">
-                      {formatEur(m.cents)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="mt-2 -mx-2">
+              <ResizableTable
+                id="top-merchants"
+                columns={[
+                  { id: "rank", width: 40, min: 30, header: "#" },
+                  { id: "merchant", width: 260, min: 120, header: "Kauppias" },
+                  {
+                    id: "count",
+                    width: 80,
+                    min: 60,
+                    header: "Kpl",
+                    headerClassName: "text-right",
+                  },
+                  {
+                    id: "sum",
+                    width: 110,
+                    min: 85,
+                    header: "Yhteensä",
+                    headerClassName: "text-right",
+                  },
+                ]}
+              >
+                <tbody>
+                  {view.merchants.map((m, i) => (
+                    <tr
+                      key={m.merchantLower}
+                      className="cursor-pointer border-b border-border transition-colors last:border-0 hover:bg-card-2"
+                      onClick={() => openMerchant(m.merchantLower, m.merchant)}
+                      title="Näytä tapahtumat"
+                    >
+                      <td className="px-4 py-1.5 text-xs tabular-nums text-muted/60">
+                        {i + 1}
+                      </td>
+                      <td
+                        className="truncate px-4 py-1.5 text-text"
+                        title={m.merchant}
+                      >
+                        {m.merchant}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-1.5 text-right text-xs tabular-nums text-muted">
+                        {m.count}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-1.5 text-right tabular-nums text-text">
+                        {formatEur(m.cents)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </ResizableTable>
+            </div>
           </Card>
         )}
       </div>

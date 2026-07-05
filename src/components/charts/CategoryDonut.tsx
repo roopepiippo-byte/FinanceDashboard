@@ -115,8 +115,9 @@ export function CategoryDonut({
         </div>
       </div>
 
-      {/* Value-labeled list = legend + drill-down */}
-      <ul className="w-full min-w-0 flex-1 self-stretch overflow-y-auto sm:max-h-[240px]">
+      {/* Value-labeled list = legend + drill-down. Never scrolls — the fold
+          caps rows at 8, so all of them are always visible. */}
+      <ul className="w-full min-w-0 flex-1 self-center">
         {view.slices.map((s) => {
           const pct = view.total > 0 ? (s.cents / view.total) * 100 : 0;
           const isFold = s.key === FOLD_KEY;
