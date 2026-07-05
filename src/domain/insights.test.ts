@@ -192,22 +192,28 @@ describe("cumulativeNetByYear", () => {
 describe("dividendBreakdown", () => {
   it("sums per year and per payer, negatives included as-is", () => {
     const txns = [
+      tx({ date: "2024-05-01", amountCents: 500, merchant: "NOKIA OYJ", merchantLower: "nokia oyj", category: "Osinko", class: "income" }),
       tx({ date: "2025-02-01", amountCents: 84, merchant: "NOKIA OYJ", merchantLower: "nokia oyj", category: "Osinko", class: "income" }),
       tx({ date: "2025-08-01", amountCents: 112, merchant: "NOKIA OYJ", merchantLower: "nokia oyj", category: "Osinko", class: "income" }),
       tx({ date: "2026-03-01", amountCents: 210, merchant: "FISKARS", merchantLower: "fiskars", category: "Osinko", class: "income" }),
       tx({ date: "2026-04-01", amountCents: -100, merchant: "FISKARS", merchantLower: "fiskars", category: "Osinko", class: "income" }),
     ];
     const d = dividendBreakdown(txns)!;
-    expect(d.year).toBe(2026);
+    // Every data year gets a column so per-year values sum to Yhteensä.
+    expect(d.years).toEqual([2024, 2025, 2026]);
     expect(d.yearTotals).toEqual([
+      { year: 2024, cents: 500 },
       { year: 2025, cents: 196 },
       { year: 2026, cents: 110 },
     ]);
-    const fiskars = d.payers.find((p) => p.merchantLower === "fiskars")!;
-    expect(fiskars.currentCents).toBe(110);
-    expect(fiskars.prevCents).toBe(0);
+    expect(d.totalCents).toBe(806);
     const nokia = d.payers.find((p) => p.merchantLower === "nokia oyj")!;
-    expect(nokia.totalCents).toBe(196);
+    expect(nokia.byYear).toEqual({ 2024: 500, 2025: 196, 2026: 0 });
+    expect(nokia.totalCents).toBe(696);
+    const fiskars = d.payers.find((p) => p.merchantLower === "fiskars")!;
+    expect(fiskars.byYear[2026]).toBe(110);
+    // Row totals reconcile with the grand total.
+    expect(d.payers.reduce((a, p) => a + p.totalCents, 0)).toBe(d.totalCents);
   });
 
   it("returns null when the category has no rows", () => {

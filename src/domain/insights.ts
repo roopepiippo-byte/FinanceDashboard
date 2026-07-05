@@ -347,20 +347,25 @@ export function cumulativeNetByYear(
 export interface PayerRow {
   merchant: string;
   merchantLower: string;
-  currentCents: number;
-  prevCents: number;
+  /** Cents per year — one entry for every year in the dataset. */
+  byYear: Record<number, number>;
   totalCents: number;
   count: number;
 }
 
 export interface DividendBreakdown {
-  year: number;
-  prevYear: number;
+  /** Every year present in the category's data, ascending. */
+  years: number[];
   yearTotals: { year: number; cents: number }[];
+  totalCents: number;
   payers: PayerRow[];
 }
 
-/** Per-payer breakdown of a (dividend) category, all signs summed as-is. */
+/**
+ * Per-payer breakdown of a (dividend) category, all signs summed as-is.
+ * Yhteensä always equals the sum of the per-year columns — every year in
+ * the data gets a column.
+ */
 export function dividendBreakdown(
   txns: Transaction[],
   category = "Osinko",
@@ -369,8 +374,22 @@ export function dividendBreakdown(
   if (rows.length === 0) return null;
 
   const years = [...new Set(rows.map((t) => Number(t.date.slice(0, 4))))].sort();
-  const year = years[years.length - 1];
-  const prevYear = year - 1;
+
+  const byPayer = new Map<string, PayerRow>();
+  for (const t of rows) {
+    const cur = byPayer.get(t.merchantLower) ?? {
+      merchant: t.merchant,
+      merchantLower: t.merchantLower,
+      byYear: Object.fromEntries(years.map((y) => [y, 0])),
+      totalCents: 0,
+      count: 0,
+    };
+    const y = Number(t.date.slice(0, 4));
+    cur.byYear[y] += t.amountCents;
+    cur.totalCents += t.amountCents;
+    cur.count += 1;
+    byPayer.set(t.merchantLower, cur);
+  }
 
   const yearTotals = years.map((y) => ({
     year: y,
@@ -379,28 +398,10 @@ export function dividendBreakdown(
       .reduce((a, t) => a + t.amountCents, 0),
   }));
 
-  const byPayer = new Map<string, PayerRow>();
-  for (const t of rows) {
-    const cur = byPayer.get(t.merchantLower) ?? {
-      merchant: t.merchant,
-      merchantLower: t.merchantLower,
-      currentCents: 0,
-      prevCents: 0,
-      totalCents: 0,
-      count: 0,
-    };
-    const y = Number(t.date.slice(0, 4));
-    if (y === year) cur.currentCents += t.amountCents;
-    if (y === prevYear) cur.prevCents += t.amountCents;
-    cur.totalCents += t.amountCents;
-    cur.count += 1;
-    byPayer.set(t.merchantLower, cur);
-  }
-
   return {
-    year,
-    prevYear,
+    years,
     yearTotals,
+    totalCents: yearTotals.reduce((a, y) => a + y.cents, 0),
     payers: [...byPayer.values()].sort((a, b) => b.totalCents - a.totalCents),
   };
 }

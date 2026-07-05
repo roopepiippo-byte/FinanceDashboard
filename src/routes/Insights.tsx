@@ -464,48 +464,66 @@ export function Insights() {
       {dividends && (
         <Card className="mt-4">
           <CardTitle>Osingot</CardTitle>
-          <p className="mt-1 text-xs tabular-nums text-muted">
-            {dividends.yearTotals
-              .map((y) => `${y.year}: ${formatEur(y.cents)}`)
-              .join(" · ")}
+          <p className="mt-1 text-xs text-muted">
+            Kaikki vuodet, joilta osinkoja on datassa — vuosisarakkeet
+            summautuvat Yhteensä-sarakkeeseen.
           </p>
-          <table className="mt-3 w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-muted">
-                <th className="py-2 pr-4 font-medium">Maksaja</th>
-                <th className="py-2 pr-4 text-right font-medium">
-                  {dividends.prevYear}
-                </th>
-                <th className="py-2 pr-4 text-right font-medium">
-                  {dividends.year}
-                </th>
-                <th className="py-2 text-right font-medium">Yhteensä</th>
-              </tr>
-            </thead>
-            <tbody>
-              {dividends.payers.map((p) => (
-                <tr
-                  key={p.merchantLower}
-                  className="cursor-pointer border-b border-border transition-colors last:border-0 hover:bg-card-2"
-                  onClick={() => openPayer(p.merchantLower, p.merchant)}
-                  title="Näytä tapahtumat"
-                >
-                  <td className="max-w-0 truncate py-2 pr-4 text-text">
-                    {p.merchant}
-                  </td>
-                  <td className="py-2 pr-4 text-right tabular-nums text-muted">
-                    {p.prevCents !== 0 ? formatEur(p.prevCents) : "—"}
-                  </td>
-                  <td className="py-2 pr-4 text-right tabular-nums text-text">
-                    {p.currentCents !== 0 ? formatEur(p.currentCents) : "—"}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="mt-3 w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-muted">
+                  <th className="py-2 pr-4 font-medium">Maksaja</th>
+                  {dividends.years.map((y) => (
+                    <th key={y} className="py-2 pr-4 text-right font-medium">
+                      {y}
+                    </th>
+                  ))}
+                  <th className="py-2 text-right font-medium">Yhteensä</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dividends.payers.map((p) => (
+                  <tr
+                    key={p.merchantLower}
+                    className="cursor-pointer border-b border-border transition-colors hover:bg-card-2"
+                    onClick={() => openPayer(p.merchantLower, p.merchant)}
+                    title="Näytä tapahtumat"
+                  >
+                    <td className="max-w-0 truncate py-2 pr-4 text-text">
+                      {p.merchant}
+                    </td>
+                    {dividends.years.map((y) => (
+                      <td
+                        key={y}
+                        className="py-2 pr-4 text-right tabular-nums text-muted"
+                      >
+                        {p.byYear[y] !== 0 ? formatEur(p.byYear[y]) : "—"}
+                      </td>
+                    ))}
+                    <td className="py-2 text-right tabular-nums text-green">
+                      {formatEur(p.totalCents)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-border font-medium">
+                  <td className="py-2 pr-4 text-text">Yhteensä</td>
+                  {dividends.yearTotals.map((y) => (
+                    <td
+                      key={y.year}
+                      className="py-2 pr-4 text-right tabular-nums text-text"
+                    >
+                      {formatEur(y.cents)}
+                    </td>
+                  ))}
                   <td className="py-2 text-right tabular-nums text-green">
-                    {formatEur(p.totalCents)}
+                    {formatEur(dividends.totalCents)}
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </tfoot>
+            </table>
+          </div>
         </Card>
       )}
 
