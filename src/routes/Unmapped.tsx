@@ -14,9 +14,10 @@ import {
 } from "@/components/TransactionsDrawer";
 import { ResizableTable } from "@/components/ui/ResizableTable";
 import { formatEur, sumCents } from "@/domain/money";
+import { matchesGlob } from "@/lib/glob";
 import { cn } from "@/lib/cn";
 
-type Tab = "unmapped" | "manual";
+type Tab = "unmapped" | "manual" | "rules";
 
 interface MerchantGroup {
   merchant: string;
@@ -32,9 +33,11 @@ export function Unmapped() {
   const applyMerchantCategory = useStore((s) => s.applyMerchantCategory);
   const applyMerchantCategories = useStore((s) => s.applyMerchantCategories);
   const toast = useToast();
+  const removeCategoryRule = useStore((s) => s.removeCategoryRule);
   const [tab, setTab] = useState<Tab>("unmapped");
   const [audit, setAudit] = useState<AuditQuery | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
+  const [ruleSearch, setRuleSearch] = useState("");
 
   const groups = useMemo<MerchantGroup[]>(() => {
     const map = new Map<string, Omit<MerchantGroup, "suggestion">>();
@@ -79,6 +82,31 @@ export function Unmapped() {
 
   const suggested = groups.filter((g) => g.suggestion !== null);
 
+  // Rules tab: transaction counts per exact merchant key + search filter.
+  const txnCountByMerchant = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const t of transactions) {
+      m.set(t.merchantLower, (m.get(t.merchantLower) ?? 0) + 1);
+    }
+    return m;
+  }, [transactions]);
+
+  const RULE_LIMIT = 150;
+  const filteredRules = useMemo(() => {
+    const q = ruleSearch.trim().toLowerCase();
+    return categoryMap
+      .filter(
+        (e) =>
+          !q ||
+          e.pattern.includes(q) ||
+          (e.display ?? "").toLowerCase().includes(q) ||
+          e.category.toLowerCase().includes(q),
+      )
+      .sort((a, b) =>
+        (a.display ?? a.pattern).localeCompare(b.display ?? b.pattern, "fi"),
+      );
+  }, [categoryMap, ruleSearch]);
+
   async function applyAllSuggestions() {
     const items = suggested.map((g) => ({
       pattern: g.merchantLower,
@@ -98,6 +126,9 @@ export function Unmapped() {
         </TabButton>
         <TabButton active={tab === "manual"} onClick={() => setTab("manual")}>
           Manuaalisesti asetettu ({manual.length})
+        </TabButton>
+        <TabButton active={tab === "rules"} onClick={() => setTab("rules")}>
+          Säännöt ({categoryMap.length})
         </TabButton>
         {tab === "unmapped" && suggested.length > 0 && (
           <Button
@@ -206,6 +237,110 @@ export function Unmapped() {
             </ResizableTable>
           </Card>
         )
+      ) : tab === "rules" ? (
+        <div>
+          <input
+            value={ruleSearch}
+            onChange={(e) => setRuleSearch(e.target.value)}
+            placeholder="Hae sääntöä (kauppias tai luokka)…"
+            className="mb-3 h-9 w-full max-w-md rounded-md border border-border bg-card px-3 text-sm text-text focus:outline-none focus:ring-2 focus:ring-accent"
+          />
+          {filteredRules.length === 0 ? (
+            <Card className="text-sm text-muted">Ei sääntöjä haulla.</Card>
+          ) : (
+            <Card className="p-0">
+              <ResizableTable
+                id="rules"
+                columns={[
+                  { id: "merchant", width: 300, min: 120, header: "Kauppias" },
+                  { id: "category", width: 230, min: 140, header: "Luokka" },
+                  {
+                    id: "count",
+                    width: 70,
+                    min: 50,
+                    header: "Kpl",
+                    headerClassName: "text-right",
+                  },
+                  { id: "actions", width: 90, min: 70, header: "" },
+                ]}
+              >
+                <tbody>
+                  {filteredRules.slice(0, RULE_LIMIT).map((e) => {
+                    const isGlob = e.pattern.includes("*");
+                    const count = isGlob
+                      ? null
+                      : (txnCountByMerchant.get(e.pattern) ?? 0);
+                    return (
+                      <tr
+                        key={e.pattern}
+                        className="border-b border-border transition-colors last:border-0 hover:bg-card-2"
+                      >
+                        <td className="truncate px-4 py-2">
+                          <button
+                            className="text-left text-text hover:text-accent hover:underline"
+                            title="Näytä tapahtumat"
+                            onClick={() =>
+                              setAudit({
+                                title: e.display ?? e.pattern,
+                                txns: transactions.filter((t) =>
+                                  isGlob
+                                    ? matchesGlob(e.pattern, t.merchantLower)
+                                    : t.merchantLower === e.pattern,
+                                ),
+                              })
+                            }
+                          >
+                            {e.display ?? e.pattern}
+                          </button>
+                        </td>
+                        <td className="px-4 py-2">
+                          <CategorySelect
+                            value={e.category}
+                            onSelect={async (category) => {
+                              await applyMerchantCategory(
+                                e.pattern,
+                                category,
+                                categoryClassOf(category),
+                                e.display,
+                              );
+                              toast.success(
+                                `${e.display ?? e.pattern} → ${category}`,
+                              );
+                            }}
+                          />
+                        </td>
+                        <td className="px-4 py-2 text-right tabular-nums text-muted">
+                          {count === null ? "—" : count}
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Poista sääntö — tapahtumat palaavat luokittelemattomiin"
+                            onClick={async () => {
+                              await removeCategoryRule(e.pattern);
+                              toast.success(
+                                `Sääntö poistettu: ${e.display ?? e.pattern}`,
+                              );
+                            }}
+                          >
+                            Poista
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </ResizableTable>
+              {filteredRules.length > RULE_LIMIT && (
+                <p className="px-4 py-2 text-xs text-muted">
+                  Näytetään {RULE_LIMIT} / {filteredRules.length} sääntöä —
+                  tarkenna hakua nähdäksesi loput.
+                </p>
+              )}
+            </Card>
+          )}
+        </div>
       ) : manual.length === 0 ? (
         <Card className="text-sm text-muted">
           Ei manuaalisesti asetettuja tapahtumia.

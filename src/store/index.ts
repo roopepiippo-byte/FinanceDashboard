@@ -97,6 +97,8 @@ interface AppState {
     cls: CategoryClass,
     display?: string,
   ) => Promise<void>;
+  /** Delete a categorization rule; its transactions become uncategorized. */
+  removeCategoryRule: (pattern: string) => Promise<void>;
   /** Mass-apply (e.g. "accept all suggestions"): one write, one recompute. */
   applyMerchantCategories: (
     items: {
@@ -296,6 +298,21 @@ export const useStore = create<AppState>((set, get) => ({
     set({
       categoryMap,
       transactions: recompute(rawTransactions, categoryMap, overrides, get().categorySettings),
+    });
+  },
+
+  async removeCategoryRule(pattern) {
+    await categoryMapRepo.remove(pattern);
+    const categoryMap = get().categoryMap.filter((e) => e.pattern !== pattern);
+    const { rawTransactions, overrides } = get();
+    set({
+      categoryMap,
+      transactions: recompute(
+        rawTransactions,
+        categoryMap,
+        overrides,
+        get().categorySettings,
+      ),
     });
   },
 
