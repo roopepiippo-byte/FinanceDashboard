@@ -123,4 +123,6 @@ export interface DisplaySettings {
    * kept their previous meaning. After that, the user's toggles rule.
    */
   transferDefaultApplied?: boolean;
+  /** First-run intro tour has been completed or skipped. */
+  onboardingDone?: boolean;
 }

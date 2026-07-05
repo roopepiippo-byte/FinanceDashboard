@@ -139,7 +139,9 @@ export function Wealth() {
       {view.totals && (
         <div className="mb-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
           <Card>
-            <CardTitle>Nettovarallisuus</CardTitle>
+            <CardTitle info="Varat miinus velat viimeisimmältä kirjatulta kuukaudelta.">
+              Nettovarallisuus
+            </CardTitle>
             <CardValue>{formatEur(view.totals.netCents)}</CardValue>
           </Card>
           <Card>
@@ -151,7 +153,9 @@ export function Wealth() {
             <CardValue>{formatEur(view.totals.debtsCents)}</CardValue>
           </Card>
           <Card>
-            <CardTitle>Likvidit varat</CardTitle>
+            <CardTitle info="Likvidiksi merkittyjen tilien (esim. pankkitilit) summa — raha, joka on heti käytettävissä.">
+              Likvidit varat
+            </CardTitle>
             <CardValue>{formatEur(view.totals.liquidCents)}</CardValue>
           </Card>
         </div>
@@ -180,14 +184,16 @@ export function Wealth() {
             </div>
           </Card>
           <Card>
-            <CardTitle>Omat sijoitukset vs. markkinatuotto</CardTitle>
+            <CardTitle info="Nettovarallisuuden kasvun jako: sininen on itse sijoittamaasi rahaa (kuukausikirjauksen 'Oma sijoitus' -kenttä), vihreä laskennallista markkinatuottoa (muutos, jota omat sijoitukset eivät selitä). Täytä Oma sijoitus -kenttä kuukausittain, jotta jako on luotettava.">
+              Omat sijoitukset vs. markkinatuotto
+            </CardTitle>
             <div className="mt-3">
               <WealthSourceChart data={view.source} />
             </div>
           </Card>
           <Card>
             <div className="flex items-center justify-between">
-              <CardTitle>
+              <CardTitle info="Tilikohtaiset arvot ja muutos edelliseen kirjaukseen. Velat näytetään negatiivisina, joten lainan lyheneminen näkyy vihreänä plussana.">
                 Viimeisin kuukausi
                 {view.latestMonth ? ` — ${formatMonthFi(view.latestMonth)}` : ""}
               </CardTitle>

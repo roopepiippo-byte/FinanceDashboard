@@ -214,14 +214,18 @@ export function Insights() {
           onClick={() => setShowRecurring(true)}
           title="Näytä erittely"
         >
-          <CardTitle>Toistuvat maksut</CardTitle>
+          <CardTitle info="Automaattisesti tunnistetut kuukausiveloitukset: sama saaja, tasainen summa ja kuukausirytmi. Mukana myös laskuista pois jätetyt luokat (esim. vastike ja lainat). Klikkaa nähdäksesi erittelyn.">
+            Toistuvat maksut
+          </CardTitle>
           <CardValue>{formatEur(recurringTotal)}/kk</CardValue>
           <p className="mt-0.5 text-xs text-muted">
             {recurring.length} tunnistettua tilausta/sitoumusta
           </p>
         </Card>
         <Card className="py-4">
-          <CardTitle>Keskikulut</CardTitle>
+          <CardTitle info="Viimeisten kuuden datakuukauden keskimääräiset kulut mukana olevista luokista.">
+            Keskikulut
+          </CardTitle>
           <CardValue>{formatEur(burn)}/kk</CardValue>
           <p className="mt-0.5 text-xs text-muted">
             6 kk keskiarvo, mukana olevat luokat
@@ -229,7 +233,9 @@ export function Insights() {
         </Card>
         {runwayMonths !== null && (
           <Card className="py-4">
-            <CardTitle>Puskuri</CardTitle>
+            <CardTitle info="Kuinka monta kuukautta likvidit varasi (Varallisuus-sivun viimeisin kirjaus) kattaisivat keskikulusi, jos tulot loppuisivat.">
+              Puskuri
+            </CardTitle>
             <CardValue>
               {formatNumberFi(Math.round(runwayMonths * 10) / 10)} kk
             </CardValue>
@@ -243,7 +249,7 @@ export function Insights() {
       {/* Month movers */}
       <Card className="mt-4">
         <div className="flex items-center justify-between">
-          <CardTitle>
+          <CardTitle info="Mikä muuttui: luokat, joiden kulut kasvoivat tai laskivat eniten edelliseen kuukauteen verrattuna. Klikkaa luokkaa nähdäksesi kuukauden tapahtumat.">
             Kuukausikatsaus — {formatMonthFi(meterMonth)} vs. edellinen
           </CardTitle>
           <div className="flex items-center gap-1">
@@ -286,7 +292,7 @@ export function Insights() {
       {/* Cumulative net race */}
       {netRace && (
         <Card className="mt-4">
-          <CardTitle>
+          <CardTitle info="Vuoden kertymä kuukausi kuukaudelta: tulot miinus kulut. Sininen viiva on kuluva vuosi, harmaa edellinen — näet yhdellä silmäyksellä, oletko viime vuoden tahtia edellä vai jäljessä.">
             Kertyvä netto — {netRace.year}
             {netRace.hasPrev ? ` vs. ${netRace.prevYear}` : ""}
           </CardTitle>

@@ -15,6 +15,7 @@ import {
 import { ResizableTable } from "@/components/ui/ResizableTable";
 import { formatEur, sumCents } from "@/domain/money";
 import { matchesGlob } from "@/lib/glob";
+import { InfoTip } from "@/components/ui/InfoTip";
 import { cn } from "@/lib/cn";
 
 type Tab = "unmapped" | "manual" | "rules";
@@ -130,6 +131,7 @@ export function Unmapped() {
         <TabButton active={tab === "rules"} onClick={() => setTab("rules")}>
           Säännöt ({categoryMap.length})
         </TabButton>
+        <InfoTip text="Luokittelematta: uudet kauppiaat odottavat luokkaa — Ehdotus-nappi hyväksyy sovelluksen arvauksen, ja valinta tallentuu säännöksi tulevia tuonteja varten. Säännöt: kaikki kauppias→luokka-säännöt; luokan vaihto täältä päivittää kauppiaan kaikki tapahtumat. Manuaalisesti asetettu: yksittäin ohitetut tapahtumat, jotka voittavat säännön." />
         {tab === "unmapped" && suggested.length > 0 && (
           <Button
             size="sm"

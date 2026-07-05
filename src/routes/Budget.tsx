@@ -165,7 +165,7 @@ export function Budget() {
       {monthMeters.length > 0 && (
         <Card className="mb-4">
           <div className="flex items-center justify-between">
-            <CardTitle>
+            <CardTitle info="Valitun kuukauden toteutuneet kulut verrattuna asettamiisi tavoitteisiin. Sininen = raameissa, keltainen = lähellä rajaa (yli 80 %), punainen = yli tavoitteen. Nuolilla selaat kuukausia; riviä klikkaamalla näet tapahtumat.">
               Kuukausi vs. tavoite — {formatMonthFi(meterMonth)}
             </CardTitle>
             <div className="flex items-center gap-1">
@@ -241,7 +241,9 @@ export function Budget() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-1">
-          <CardTitle>Säästötavoite</CardTitle>
+          <CardTitle info="Suunnitelma tuloillesi: Säästöt on tavoitteesi, Kohdennettu on luokkabudjettien summa ja Kohdentamaton se osa tuloista, jolla ei vielä ole suunnitelmaa. Hyvä tavoitetila: kohdentamaton lähellä nollaa.">
+            Säästötavoite
+          </CardTitle>
           <p className="mt-1 text-xs text-muted">
             Osuus keskimääräisistä kuukausituloista {formatEur(avgIncome)}/kk
             (viimeiset 12 kk, joilta on tapahtumia)
@@ -352,7 +354,9 @@ export function Budget() {
 
         <Card className="lg:col-span-2">
           <div className="mb-3 flex items-center justify-between">
-            <CardTitle>Kohdennus luokittain</CardTitle>
+            <CardTitle info="Aseta kullekin luokalle kuukausibudjetti prosentteina tuloista tai euroina — kentät synkronoituvat. Vertailuna luokan toteutunut 12 kk keskiarvo ja viime kuukausi. Täytä historiasta -nappi asettaa tavoitteet toteuman tasolle.">
+              Kohdennus luokittain
+            </CardTitle>
             <Button variant="outline" size="sm" onClick={fillFromHistory}>
               Täytä 12kk historiasta
             </Button>

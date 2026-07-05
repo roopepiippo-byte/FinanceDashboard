@@ -1,5 +1,6 @@
 import type { HTMLAttributes } from "react";
 import { cn } from "@/lib/cn";
+import { InfoTip } from "./InfoTip";
 
 export function Card({
   className,
@@ -18,13 +19,25 @@ export function Card({
 
 export function CardTitle({
   className,
+  info,
+  children,
   ...props
-}: HTMLAttributes<HTMLHeadingElement>) {
+}: HTMLAttributes<HTMLHeadingElement> & {
+  /** Optional help text shown behind an "i" icon after the title. */
+  info?: string;
+}) {
   return (
     <h3
-      className={cn("text-sm font-medium text-muted", className)}
+      className={cn(
+        "text-sm font-medium text-muted",
+        info && "flex items-center gap-1.5",
+        className,
+      )}
       {...props}
-    />
+    >
+      {children}
+      {info && <InfoTip text={info} />}
+    </h3>
   );
 }
 

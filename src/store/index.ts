@@ -83,6 +83,7 @@ interface AppState {
   resetCategoryColors: () => Promise<void>;
   setQuickSpend: (categories: string[]) => Promise<void>;
   setCarChartHidden: (hidden: boolean) => Promise<void>;
+  setOnboardingDone: () => Promise<void>;
   addCustomCategory: (
     name: string,
     cls: CategoryClass,
@@ -532,6 +533,13 @@ export const useStore = create<AppState>((set, get) => ({
 
   async setCarChartHidden(hidden) {
     const settings = { ...get().settings, carChartHidden: hidden };
+    await settingsRepo.save(settings);
+    set({ settings });
+  },
+
+  async setOnboardingDone() {
+    if (get().settings.onboardingDone) return;
+    const settings = { ...get().settings, onboardingDone: true };
     await settingsRepo.save(settings);
     set({ settings });
   },

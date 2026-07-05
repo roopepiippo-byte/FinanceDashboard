@@ -181,6 +181,7 @@ export function Dashboard() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi
           title="Tulot"
+          info="Valitun aikavälin tulot mukana olevista luokista (luokan tyyppi Tulot, tai positiivinen siirtoluokan tapahtuma). Pieni käyrä näyttää kuukausikehityksen. Klikkaa nähdäksesi tapahtumat."
           value={formatEur(kpis.incomeCents)}
           delta={moneyDelta(kpis.incomeCents, priorKpis.incomeCents, true)}
           spark={sparks.income}
@@ -188,6 +189,7 @@ export function Dashboard() {
         />
         <Kpi
           title="Kulut"
+          info="Valitun aikavälin kulut mukana olevista luokista. Asetuksissa pois rastitut luokat (esim. siirrot omille tileille) eivät ole mukana. Klikkaa nähdäksesi tapahtumat."
           value={formatEur(kpis.expenseCents)}
           delta={moneyDelta(kpis.expenseCents, priorKpis.expenseCents, false)}
           spark={sparks.expense}
@@ -195,6 +197,7 @@ export function Dashboard() {
         />
         <Kpi
           title="Netto"
+          info="Tulot miinus kulut valitulla aikavälillä — paljonko jäi viivan alle. Klikkaa nähdäksesi kaikki mukana olevat tapahtumat."
           value={formatEur(kpis.netCents)}
           delta={moneyDelta(kpis.netCents, priorKpis.netCents, true)}
           spark={sparks.net}
@@ -202,6 +205,7 @@ export function Dashboard() {
         />
         <Kpi
           title="Säästöaste"
+          info="Netto jaettuna tuloilla: kuinka suuri osa tuloista jäi säästöön. Vertailu on edellisen vuoden samaan aikaväliin."
           value={`${formatNumberFi(kpis.savingsRatePct)} %`}
           delta={savingsDelta}
           spark={sparks.rate}
@@ -253,13 +257,17 @@ export function Dashboard() {
       {/* Charts */}
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Card>
-          <CardTitle>Kassavirta kuukausittain</CardTitle>
+          <CardTitle info="Kuukauden tulot (vihreä) ja kulut (punainen) pylväinä, netto sinisenä viivana. Klikkaa pylvästä porautuaksesi kuukauden tapahtumiin.">
+            Kassavirta kuukausittain
+          </CardTitle>
           <div className="mt-3">
             <TrendChart data={view.monthly} onSelectMonth={openMonth} />
           </div>
         </Card>
         <Card>
-          <CardTitle>Kulut luokittain</CardTitle>
+          <CardTitle info="Aikavälin kulut luokittain: 7 suurinta omina lohkoinaan, loput koottuna Muut pienet -ryhmään. Klikkaa lohkoa tai listariviä nähdäksesi tapahtumat.">
+            Kulut luokittain
+          </CardTitle>
           <div className="mt-3">
             <CategoryDonut
               data={view.spend}
@@ -274,7 +282,9 @@ export function Dashboard() {
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
         {!settings.carChartHidden && view.carData.length > 0 && (
           <Card>
-            <CardTitle>Bensa + Auto</CardTitle>
+            <CardTitle info="Bensa- ja Auto-luokkien yhteenlasketut kulut kuukausittain. Kaavion voi piilottaa Asetuksista.">
+              Bensa + Auto
+            </CardTitle>
             <div className="mt-3">
               <CarChart data={view.carData} onSelectMonth={openCarMonth} />
             </div>
@@ -282,7 +292,9 @@ export function Dashboard() {
         )}
         {view.merchants.length > 0 && (
           <Card className="pb-2">
-            <CardTitle>Suurimmat kauppiaat</CardTitle>
+            <CardTitle info="Aikavälin suurimmat kulukohteet kauppiaittain. Klikkaa riviä nähdäksesi tapahtumat; sarakkeiden leveyttä voi säätää otsikon reunasta vetämällä.">
+              Suurimmat kauppiaat
+            </CardTitle>
             <div className="mt-2 -mx-2">
               <ResizableTable
                 id="top-merchants"
@@ -383,12 +395,14 @@ function Sparkline({ values }: { values: number[] }) {
 
 function Kpi({
   title,
+  info,
   value,
   delta,
   spark,
   onClick,
 }: {
   title: string;
+  info?: string;
   value: string;
   delta: Delta | null;
   spark?: number[];
@@ -405,7 +419,7 @@ function Kpi({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <CardTitle>{title}</CardTitle>
+          <CardTitle info={info}>{title}</CardTitle>
           <p className="mt-1 truncate text-2xl font-semibold text-text">
             {value}
           </p>
