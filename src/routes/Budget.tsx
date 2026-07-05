@@ -14,7 +14,7 @@ import {
   monthSpendByCategory,
 } from "@/domain/budget";
 import { cn } from "@/lib/cn";
-import { flowDirection } from "@/domain/totals";
+import { flowDirection, monthlyFlows } from "@/domain/totals";
 import {
   TransactionsDrawer,
   type AuditQuery,
@@ -126,6 +126,16 @@ export function Budget() {
     budget.savingsGoalPct,
     history.map((r) => budget.categories[r.category]?.targetPct ?? 0),
   );
+
+  // Reality check: actual savings rate over the last 12 data months.
+  const actualSavingsPct = useMemo(() => {
+    const flows = monthlyFlows(transactions, visible).slice(-12);
+    const income = flows.reduce((a, f) => a + f.incomeCents, 0);
+    const expense = flows.reduce((a, f) => a + f.expenseCents, 0);
+    return income > 0
+      ? Math.round(((income - expense) / income) * 1000) / 10
+      : null;
+  }, [transactions, visible]);
 
   const pieData = [
     { name: "Säästöt", value: Math.max(0, alloc.savingsPct), color: "#4ade80" },
@@ -282,17 +292,60 @@ export function Budget() {
                 />
               </PieChart>
             </ResponsiveContainer>
-            <div className="flex justify-center gap-4 text-xs text-muted">
-              {pieData.map((d) => (
-                <span key={d.name} className="flex items-center gap-1">
+            {/* Plan breakdown in euros — the pie explained */}
+            <ul className="mt-2 space-y-1 text-xs">
+              {[
+                {
+                  ...pieData[0],
+                  hint: "tavoitteesi: jää säästöön",
+                },
+                {
+                  ...pieData[1],
+                  hint: "luokkabudjettien summa (taulukon Tavoite-%:t)",
+                },
+                {
+                  ...pieData[2],
+                  hint: "ilman suunnitelmaa — kasvata säästötavoitetta tai luokkabudjetteja",
+                },
+              ].map((d) => (
+                <li key={d.name} className="flex items-start gap-2">
                   <span
-                    className="inline-block h-2 w-2 rounded-full"
+                    className="mt-1 inline-block h-2 w-2 shrink-0 rounded-full"
                     style={{ background: d.color }}
                   />
-                  {d.name}
-                </span>
+                  <span className="min-w-0 flex-1 text-muted">
+                    <span className="text-text">{d.name}</span>{" "}
+                    <span className="tabular-nums">
+                      {formatNumberFi(d.value)} % ·{" "}
+                      {formatEur(pctToTargetCents(d.value, avgIncome))}/kk
+                    </span>
+                    <span className="block text-muted/70">{d.hint}</span>
+                  </span>
+                </li>
               ))}
-            </div>
+            </ul>
+
+            {actualSavingsPct !== null && (
+              <p className="mt-3 border-t border-border pt-3 text-xs text-muted">
+                Toteutunut säästöaste (12 kk):{" "}
+                <span
+                  className={cn(
+                    "font-medium tabular-nums",
+                    actualSavingsPct >= budget.savingsGoalPct
+                      ? "text-green"
+                      : "text-red",
+                  )}
+                >
+                  {formatNumberFi(actualSavingsPct)} %
+                </span>{" "}
+                vs. tavoite{" "}
+                <span className="tabular-nums">
+                  {formatNumberFi(budget.savingsGoalPct)} %
+                </span>
+                {actualSavingsPct > budget.savingsGoalPct + 5 &&
+                  " — säästät jo enemmän kuin tavoitteesi; tavoitetta voi nostaa."}
+              </p>
+            )}
           </div>
         </Card>
 
