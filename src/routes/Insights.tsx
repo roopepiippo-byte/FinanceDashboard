@@ -6,7 +6,6 @@ import {
   TransactionsDrawer,
   type AuditQuery,
 } from "@/components/TransactionsDrawer";
-import { ResizableTable } from "@/components/ui/ResizableTable";
 import {
   Line,
   LineChart,
@@ -388,63 +387,6 @@ export function Insights() {
         </Card>
       )}
 
-      {/* Recurring charges */}
-      <Card className="mt-4 p-0">
-        <div className="px-5 pt-5">
-          <CardTitle>Toistuvat maksut</CardTitle>
-          <p className="mt-1 text-xs text-muted">
-            Tunnistettu kuukausirytmistä ja vakaasta summasta. Sisältää myös
-            laskuista pois jätetyt luokat (esim. vastike, lainat) — sitoumus on
-            sitoumus.
-          </p>
-        </div>
-        <div className="mt-3">
-          <ResizableTable
-            id="recurring"
-            columns={[
-              { id: "merchant", width: 280, min: 120, header: "Maksunsaaja" },
-              { id: "category", width: 130, min: 90, header: "Luokka" },
-              { id: "n", width: 70, min: 50, header: "Kpl" },
-              { id: "last", width: 130, min: 90, header: "Viimeisin" },
-              {
-                id: "monthly",
-                width: 110,
-                min: 85,
-                header: "€/kk",
-                headerClassName: "text-right",
-              },
-            ]}
-          >
-            <tbody>
-              {recurring.map((r) => (
-                <tr
-                  key={r.merchantLower}
-                  className="cursor-pointer border-b border-border transition-colors last:border-0 hover:bg-card-2"
-                  onClick={() => openMerchant(r.merchantLower, r.merchant)}
-                  title="Näytä tapahtumat"
-                >
-                  <td className="truncate px-4 py-2 text-text" title={r.merchant}>
-                    {r.merchant}
-                  </td>
-                  <td className="truncate px-4 py-2 text-xs text-muted">
-                    {r.category}
-                  </td>
-                  <td className="px-4 py-2 tabular-nums text-muted">
-                    {r.occurrences}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-2 tabular-nums text-muted">
-                    {formatDateFi(r.lastDate)}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-2 text-right tabular-nums text-text">
-                    {formatEur(r.monthlyCents)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </ResizableTable>
-        </div>
-      </Card>
-
       {/* Year over year */}
       {yoy && (
         <Card className="mt-4">
@@ -606,6 +548,10 @@ export function Insights() {
                   <span className="font-medium tabular-nums text-red">
                     {formatEur(recurringTotal)}/kk
                   </span>
+                </p>
+                <p className="mt-1 text-xs text-muted/70">
+                  Tunnistettu kuukausirytmistä ja vakaasta summasta; sisältää
+                  myös laskuista pois jätetyt luokat (esim. vastike, lainat).
                 </p>
               </div>
               <Button
