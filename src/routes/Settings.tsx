@@ -25,6 +25,8 @@ export function Settings() {
   useStore((s) => s.customCategories);
   const importCategoryDb = useStore((s) => s.importCategoryDb);
   const exportCategoryDb = useStore((s) => s.exportCategoryDb);
+  const exportFullBackup = useStore((s) => s.exportFullBackup);
+  const importFullBackup = useStore((s) => s.importFullBackup);
   const toggleCategoryVisibility = useStore((s) => s.toggleCategoryVisibility);
   const setCategoryColor = useStore((s) => s.setCategoryColor);
   const setCategoryClass = useStore((s) => s.setCategoryClass);
@@ -66,6 +68,13 @@ export function Settings() {
   >(null);
   const [busy, setBusy] = useState(false);
   const [danger, setDanger] = useState<DangerAction>(null);
+  const [backupMode, setBackupMode] = useState<"merge" | "replace">("merge");
+  const [backupBusy, setBackupBusy] = useState(false);
+  const [pendingBackupImport, setPendingBackupImport] = useState<{
+    text: string;
+    mode: "merge" | "replace";
+  } | null>(null);
+  const backupInputRef = useRef<HTMLInputElement>(null);
   const [newCat, setNewCat] = useState("");
   const [newClass, setNewClass] = useState<CategoryClass>("expense");
   const [newColor, setNewColor] = useState("#8ab4f8");
@@ -114,10 +123,97 @@ export function Settings() {
     toast.success("Luokittelutietokanta viety");
   }
 
+  function handleBackupExport() {
+    const json = exportFullBackup();
+    const blob = new Blob([json], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `talousdashboard-varmuuskopio-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Varmuuskopio viety");
+  }
+
+  async function runBackupImport(text: string, mode: "merge" | "replace") {
+    setBackupBusy(true);
+    try {
+      const summary = await importFullBackup(text, mode);
+      toast.success(
+        `Palautettu ${summary.transactions} tapahtumaa, ` +
+          `${summary.categoryRules} luokittelusääntöä, ` +
+          `${summary.wealthMonths} varallisuuskuukautta`,
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Palautus epäonnistui");
+    } finally {
+      setBackupBusy(false);
+      if (backupInputRef.current) backupInputRef.current.value = "";
+    }
+  }
+
+  async function handleBackupFile(file: File | undefined) {
+    if (!file) return;
+    const text = await file.text();
+    if (backupMode === "replace") {
+      setPendingBackupImport({ text, mode: "replace" });
+      return;
+    }
+    await runBackupImport(text, "merge");
+  }
+
   const expenseCategories = categories.filter((c) => c.class === "expense");
 
   return (
     <div className="max-w-3xl">
+      <Card className="mb-4 border-accent/30">
+        <CardTitle>Varmuuskopio</CardTitle>
+        <p className="mt-2 text-sm text-muted">
+          Vie kaikki tiedot yhteen tiedostoon: tapahtumat, luokittelut (myös
+          käsin korjatut), säännöt, budjetti ja varallisuustiedot. Käytä tätä
+          siirtääksesi tiedot toiseen selaimeen tai laitteeseen, esimerkiksi
+          GitHub Pages -version käyttöön.
+        </p>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <Button size="sm" onClick={handleBackupExport}>
+            Vie varmuuskopio
+          </Button>
+          <div className="flex items-center gap-2 text-sm">
+            <label className="flex items-center gap-1">
+              <input
+                type="radio"
+                checked={backupMode === "merge"}
+                onChange={() => setBackupMode("merge")}
+              />
+              Yhdistä
+            </label>
+            <label className="flex items-center gap-1">
+              <input
+                type="radio"
+                checked={backupMode === "replace"}
+                onChange={() => setBackupMode("replace")}
+              />
+              Korvaa kaikki
+            </label>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={backupBusy}
+            onClick={() => backupInputRef.current?.click()}
+          >
+            {backupBusy ? "Palautetaan…" : "Tuo varmuuskopio"}
+          </Button>
+          <input
+            ref={backupInputRef}
+            type="file"
+            accept=".json,application/json"
+            className="hidden"
+            onChange={(e) => void handleBackupFile(e.target.files?.[0])}
+          />
+        </div>
+      </Card>
+
       <Card className="mb-4">
         <CardTitle>Tiedot</CardTitle>
         <dl className="mt-3 grid grid-cols-2 gap-y-2 text-sm sm:grid-cols-4">
@@ -475,6 +571,22 @@ export function Settings() {
           </Button>
         </div>
       </Card>
+
+      <ConfirmDialog
+        open={pendingBackupImport !== null}
+        title="Korvaa kaikki tiedot"
+        message="Kaikki nykyiset tapahtumat, luokittelut, säännöt, budjetti ja varallisuustiedot poistetaan ja korvataan varmuuskopion sisällöllä. Tätä ei voi perua."
+        confirmLabel="Korvaa"
+        onCancel={() => {
+          setPendingBackupImport(null);
+          if (backupInputRef.current) backupInputRef.current.value = "";
+        }}
+        onConfirm={async () => {
+          const pending = pendingBackupImport!;
+          setPendingBackupImport(null);
+          await runBackupImport(pending.text, pending.mode);
+        }}
+      />
 
       <ConfirmDialog
         open={pendingAccountDelete !== null}

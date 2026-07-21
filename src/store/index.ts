@@ -39,6 +39,7 @@ import {
   parseCategoryDbCsv,
   serializeCategoryDbCsv,
 } from "@/domain/categoryDb";
+import { serializeBackup, parseBackup } from "@/domain/backup";
 import { computeRange, type DateRange } from "@/lib/dateRange";
 
 export interface ImportSummary {
@@ -119,12 +120,23 @@ interface AppState {
     mode: "merge" | "replace",
   ) => Promise<CategoryDbImportSummary>;
   exportCategoryDb: () => string;
+  exportFullBackup: () => string;
+  importFullBackup: (
+    text: string,
+    mode: "merge" | "replace",
+  ) => Promise<FullBackupImportSummary>;
 }
 
 export interface CategoryDbImportSummary {
   imported: number;
   newCustomCategories: number;
   skipped: number;
+}
+
+export interface FullBackupImportSummary {
+  transactions: number;
+  categoryRules: number;
+  wealthMonths: number;
 }
 
 function recompute(
@@ -390,6 +402,63 @@ export const useStore = create<AppState>((set, get) => ({
 
   exportCategoryDb() {
     return serializeCategoryDbCsv(get().categoryMap);
+  },
+
+  exportFullBackup() {
+    const s = get();
+    return serializeBackup({
+      transactions: s.rawTransactions,
+      importedFiles: s.importedFiles,
+      categoryMap: s.categoryMap,
+      overrides: s.overrides,
+      categorySettings: s.categorySettings,
+      customCategories: s.customCategories,
+      settings: s.settings,
+      budget: s.budget,
+      wealthSnapshots: s.wealthSnapshots,
+      wealthAccounts: s.wealthAccounts,
+    });
+  },
+
+  async importFullBackup(text, mode) {
+    const backup = parseBackup(text);
+
+    if (mode === "replace") {
+      const db = await getDB();
+      await Promise.all([
+        db.clear("transactions"),
+        db.clear("importedFiles"),
+        db.clear("categoryMap"),
+        db.clear("overrides"),
+        db.clear("budget"),
+        db.clear("categorySettings"),
+        db.clear("customCategories"),
+        db.clear("wealthSnapshots"),
+        db.clear("wealthAccounts"),
+        db.clear("settings"),
+      ]);
+    }
+
+    await Promise.all([
+      transactionsRepo.bulkUpsert(backup.transactions),
+      categoryMapRepo.bulkUpsert(backup.categoryMap),
+      categorySettingsRepo.bulkSave(backup.categorySettings),
+      wealthAccountsRepo.bulkUpsert(backup.wealthAccounts),
+      settingsRepo.save(backup.settings),
+      budgetRepo.save(backup.budget),
+    ]);
+    for (const f of backup.importedFiles) await importedFilesRepo.add(f);
+    for (const o of backup.overrides) await overridesRepo.set(o);
+    for (const c of backup.customCategories) await customCategoriesRepo.add(c);
+    for (const w of backup.wealthSnapshots) await wealthRepo.upsert(w);
+
+    await get().init();
+
+    return {
+      transactions: backup.transactions.length,
+      categoryRules: backup.categoryMap.length,
+      wealthMonths: backup.wealthSnapshots.length,
+    };
   },
 
   async setOverride(transactionId, category, cls) {
